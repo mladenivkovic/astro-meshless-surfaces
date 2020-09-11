@@ -1,0 +1,6 @@
+include *.txt *.md
+
+include examples/snapshot_perturbed.hdf5
+include examples/snapshot_uniform.hdf5
+include examples/snapshot_sodshock.hdf5
+include examples/check_neighbours.py

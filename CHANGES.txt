@@ -1,0 +1,14 @@
+v0.1.14 19.11.2019 -- added neighboursearch for non-square scenarios. Simplified ivanova versions. Indices overhaul in ivanova, now consistent with swift.
+v0.1.13 13.11.2019 -- fixed neighboursearch; forgot to un-comment iind search. Extended check_version.py
+v0.1.12 10.11.2019 -- another neighboursearch overhaul
+v0.1.11 07.11.2019 -- bugfix neighbours. Added faster version to search for neighbours.
+v0.1.10 06.11.2019 -- bugfix in Aij_Ivanova_all. Removed whitespaces.
+v0.1.9 07.10.2019 -- bugfixing and cleanup; removed integrand example. Added lincence headers, cleanup with pycharm, h5py dependency. Added 'deprecated.py'
+v0.1.8 04.09.2019 -- index renaming Ivanova, added snapstr, bugfixing
+v0.1.7 03.09.2019 -- double-checking of indices chaos
+v0.1.6 02.09.2019 -- Fixes, consistency
+v0.1.5 26.08.2019 -- Bugfixes
+v0.1.4 25.08.2019 -- Bugfixes, forgot self contribution
+v0.1.4 20.08.2019 -- Moved to single precision floats
+v0.1.3 19.08.2019 -- Speedup Ivanova, now can read new SWIFT headers, now can sort particles by ID when reading them in, minor bugfixes
+v0.1, 14.07.2019 -- Initial release
