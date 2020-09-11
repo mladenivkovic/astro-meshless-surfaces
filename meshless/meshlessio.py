@@ -12,20 +12,52 @@
 # This file is part of astro-meshless-surfaces.
 ###########################################################################################
 
+"""
+All io related functions.
+"""
 
-# =========================================================
-def read_file(srcfile, ptype="PartType0", sort=False):
-    # =========================================================
+from typing import Union
+
+
+def read_file(srcfile: str, ptype: str = "PartType0", sort: bool = False):
     """
     Read swift output hdf5 file.
-    srcfile:    string of file to be read in
-    ptype:      which particle type to work with
-    sort:       whether to sort read in arrays by particle ID
 
-    returns:
-    x, y, h, rho, m, ids: numpy arrays of x, y position,
-        smoothing length, density, mass, particle ID
-    npart: Number of particles
+    Parameters
+    ----------
+    
+    srcfile: str
+        string of file to be read in
+
+    ptype: str
+        which particle type to work with
+ 
+    sort: bool
+        whether to sort read in arrays by particle ID
+
+
+    Returns
+    -------
+    x: numpy.ndarray
+        particle x positions
+
+    y: numpy.ndarray
+        particle y positions
+
+    h: numpy.ndarray
+        kernel support radii
+
+    rho: numpy.ndarray
+        particle densities
+
+    m: numpy.ndarray
+        particle masses
+
+    ids: numpy.ndarray
+        particle IDs
+
+    npart: int
+        number of particles
     """
 
     import h5py
@@ -63,23 +95,35 @@ def read_file(srcfile, ptype="PartType0", sort=False):
     return x, y, h, rho, m, ids, npart
 
 
-# ====================================
-def get_sample_size(prefix=None):
-    # ====================================
+def get_sample_size(prefix: Union[str, None] = None):
     """
-    Count how many files we're dealing with
+    Count how many files we're dealing with.
     Assumes snapshots start with "snapshot-" string and contain
     two numbers: snapshot-XXX-YYY_ZZZZ.hdf5, where both XXX and YYY
     are integers, have the same minimal, maximal value and same
     difference between two consecutive numbers.
 
-    if prefix is given, it will prepend it to snapshots.
+    If prefix is given, it will prepend it to snapshots.
 
-    this is intended for numbered output.
-    Returns:
-        nx : number of files (in one direction)
-        filenummax: highest XXX
-        fileskip: integer difference between two XXX or YYY
+    This is intended for numbered output.
+
+    Parameters
+    ----------
+
+    prefix: str or None
+        prefix/directory to prepend to 'snapshot-' when looking for files.
+
+    Returns
+    -------
+
+    nx : int
+        number of files (in one direction)
+
+    filenummax: int 
+        highest XXX
+
+    fileskip: int
+        integer difference between two XXX or YYY
     """
 
     import os
@@ -116,13 +160,22 @@ def get_sample_size(prefix=None):
     return nx, filenummax, fileskip
 
 
-# ==============================
 def snapstr(number):
-    # ==============================
     """
     return formatted string for snapshot number
     (4 digit, zero padded string). Can take both
     strings and integers as argument.
+
+    Parameters
+    ----------
+
+    number: int or str
+        which snapshot number we want
+
+    Returns
+    -------
+    snapstr: str
+        4 digit zero padded string of snapshot number
     """
 
     if hasattr(number, "__len__") and (not isinstance(number, str)):
@@ -145,15 +198,22 @@ def snapstr(number):
     return "{0:04d}".format(n)
 
 
-# ===========================================
 def read_boxsize(fnamestr="_0000.hdf5"):
-    # ===========================================
     """
-    Looks for a swift hdf5 file that contains fnamestr and reads in
+    Looks for a swift hdf5 file that contains `fnamestr` and reads in the
     boxsize.
 
-    returns:
-        boxsize: [xdim, ydim, zdim] list, where xdim, ydim, zdim are floats
+    Parameters
+    ----------
+
+    fnamestr: str
+        string to look for in snapshot filename.
+
+    Returns
+    -------
+
+    boxsize: list
+        [xdim, ydim, zdim] list, where xdim, ydim, zdim are floats
     """
 
     import os
@@ -166,11 +226,8 @@ def read_boxsize(fnamestr="_0000.hdf5"):
             f5 = h5py.File(f)
             h = f5["Header"]
             boxsize = h.attrs["BoxSize"]
-            print("read in boxsize from", f)
             f5.close()
             return boxsize
 
     # if you're out and haven't found file, say it
-    print("Haven't found any file that contains", fnamestr)
-    print("quitting")
-    quit()
+    raise IOError("Haven't found any file that contains", fnamestr)

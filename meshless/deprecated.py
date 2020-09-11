@@ -11,18 +11,16 @@
 # This file is part of astro-meshless-surfaces.
 ###########################################################################################
 
-# =========================================================
-# This file contains deprecated functions that I
-# still have a look into every now and then and am
-# too lazy to look in the git history every time.
-# =========================================================
+"""
+This file contains deprecated functions that I
+still have a look into every now and then and am
+too lazy to look in the git history every time.
+"""
 
 
-# =====================================================================================================================
 def Aij_Ivanova_approximate_gradients(
     pind, x, y, h, m, rho, kernel="cubic_spline", fact=1, L=1, periodic=True
 ):
-    # =====================================================================================================================
     """
     Compute A_ij as defined by Ivanova 2013
     pind:           particle index for which to work for (The i in A_ij)
@@ -136,11 +134,9 @@ def Aij_Ivanova_approximate_gradients(
     return -A_ij
 
 
-# ==================================================================================================================
 def Aij_Ivanova_analytical_gradients(
     pind, x, y, h, m, rho, kernel="cubic_spline", fact=1, L=1, periodic=True
 ):
-    # ==================================================================================================================
     """
     Compute A_ij as defined by Ivanova 2013. Use analytical expressions for the
     gradient of the kernels instead of the matrix representation.
@@ -238,7 +234,6 @@ def Aij_Ivanova_analytical_gradients(
     return -A_ij
 
 
-# =========================================================================================================================
 def Integrand_Aij_Ivanova(
     iind,
     jind,
@@ -255,7 +250,6 @@ def Integrand_Aij_Ivanova(
     L=1,
     periodic=True,
 ):
-    # =========================================================================================================================
     """
     Compute the effective area integrand for the particles iind jind at
     the positions xx, yy
@@ -416,3 +410,89 @@ def Integrand_Aij_Ivanova(
     A_ij = psi_i_of_x * sum_j - psi_j_of_x * sum_i
 
     return A_ij
+
+
+def get_grad_psi_j_at_i_analytical_old(
+    x,
+    y,
+    h,
+    omega,
+    W_j_at_i,
+    neighbour_data,
+    kernel="cubic_spline",
+    L: List = (1.0, 1.0),
+    periodic=True,
+):
+    """
+    Compute \nabla \psi_k (x_l) for all particles k and l
+    x, y, h:        arrays of positions and compact support radius of all particles
+    omega:          weights; sum_j W(x - xj) for all particles x=x_k
+    W_j_at_i:       W_k(x_l) npart x npart array
+    neighbour_data: neighbour_data object. See function get_neighbour_data_for_all
+    kernel:         which kernel to use
+    L:              boxsize
+    periodic:       whether to assume periodic boundaries
+
+    returns:
+
+        grad_psi_j_at_i: npart x max_neigh x 2 array; grad psi_j (x_i) for all i,j for both x and y direction
+    """
+
+    npart = x.shape[0]
+    maxneigh = neighbour_data.maxneigh
+    neighbours = neighbour_data.neighbours
+    nneigh = neighbour_data.nneigh
+    iinds = neighbour_data.iinds
+
+    # gradient of psi_j at neighbour i's position
+    grad_psi_j_at_i = np.zeros((npart, maxneigh, 2), dtype=my_float)
+    # gradient of W_j at neighbour i's position
+    grad_W_j_at_i = np.zeros((npart, maxneigh, 2), dtype=my_float)
+    # gradient sum for the same h_i
+    sum_grad_W = np.zeros((npart, 2), dtype=my_float)
+
+    #  old version
+    #  for i in range(npart):
+    #      for j, jind in enumerate(neighbours[i]):
+    #          dx, dy = get_dx(x[i], x[jind], y[i], y[jind], L=L, periodic=periodic)
+    #          r = np.sqrt(dx**2 + dy**2)
+    #
+    #          dwdr = dWdr(r/h[i], h[i], kernel)
+    #          iind = iinds[i, j]
+    #
+    #          grad_W_j_at_i[jind, iind, 0] = dwdr * dx / r
+    #          grad_W_j_at_i[jind, iind, 1] = dwdr * dy / r
+    #
+    #          sum_grad_W[i] += grad_W_j_at_i[jind, iind]
+
+    for j in range(npart):
+        for i, ind_n in enumerate(neighbours[j]):
+            dx, dy = get_dx(x[ind_n], x[j], y[ind_n], y[j], L=L, periodic=periodic)
+            r = np.sqrt(dx ** 2 + dy ** 2)
+
+            dwdr = dWdr(r / h[ind_n], h[ind_n], kernel)
+
+            grad_W_j_at_i[j, i, 0] = dwdr * dx / r
+            grad_W_j_at_i[j, i, 1] = dwdr * dy / r
+
+            # now compute the term needed for the gradient sum need to do it separately: if i is neighbour of j,
+            # but j is not neighbour of i, then j's contribution will be missed
+            # minus: inverse dx, dy
+            dwdr = dWdr(r / h[j], h[j], kernel)
+            sum_grad_W[j] -= dwdr * np.array([dx, dy]) / r
+
+    # finish computing the gradients: Need W(r, h), which is currently stored as psi
+    for j in range(npart):
+        for i, ind_n in enumerate(neighbours[j]):
+            grad_psi_j_at_i[j, i, 0] = (
+                grad_W_j_at_i[j, i, 0] / omega[ind_n]
+                - W_j_at_i[j, i] * sum_grad_W[ind_n, 0] / omega[ind_n] ** 2
+            )
+            grad_psi_j_at_i[j, i, 1] = (
+                grad_W_j_at_i[j, i, 1] / omega[ind_n]
+                - W_j_at_i[j, i] * sum_grad_W[ind_n, 1] / omega[ind_n] ** 2
+            )
+
+    del grad_W_j_at_i, sum_grad_W
+
+    return grad_psi_j_at_i

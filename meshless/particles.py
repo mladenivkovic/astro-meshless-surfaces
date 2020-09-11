@@ -54,30 +54,69 @@ def find_index_by_id(ids, id_to_look_for):
     return pind
 
 
-def find_neighbours(ind, x, y, h, fact=1.0, L: tuple = (1.0, 1.0), periodic=True):
+def find_neighbours(ind, x, y, h, L: List = (1.0, 1.0), periodic=True):
     """
     Find indices of all neighbours of a particle with index ind
-    within fact*h (where kernel != 0)
+    within h (where kernel != 0)
     x, y, h:    arrays of positions/h of all particles
-    fact:       kernel support radius factor: W = 0 for r > fact*h
     L:          boxsize
     periodic:   Whether you assume periodic boundary conditions
 
     returns list of neighbour indices in x,y,h array
     """
 
+    x0 = x[ind]
+    y0 = y[ind]
+    fhsq = h[ind] * h[ind]
+    neigh = [None for i in x]
+
+    j = 0
+    for i in range(x.shape[0]):
+        if i == ind:
+            continue
+
+        dx, dy = get_dx(x0, x[i], y0, y[i], L=L, periodic=periodic)
+
+        dist = dx ** 2 + dy ** 2
+
+        if dist < fhsq:
+            neigh[j] = i
+            j += 1
+
+    return neigh[:j]
+
+
+def find_neighbours_arbitrary_x(x0, y0, x, y, h, L: List = (1.0, 1.0), periodic=True):
+    """
+    Find indices of all neighbours around position x0, y0
+    within h (where kernel != 0)
+    x, y, h:    arrays of positions/h of all particles
+    L:          boxsize
+    periodic:   Whether you assume periodic boundary conditions
+
+    returns list of neighbour indices
+    """
+
     # None for Gaussian
-    if fact is not None:
+    neigh = [None for i in x]
+    j = 0
 
-        x0 = x[ind]
-        y0 = y[ind]
-        fhsq = h[ind] * h[ind] * fact * fact
-        neigh = [None for i in x]
+    if isinstance(h, np.ndarray):
 
-        j = 0
         for i in range(x.shape[0]):
-            if i == ind:
-                continue
+
+            dx, dy = get_dx(x0, x[i], y0, y[i], L=L, periodic=periodic)
+
+            dist = dx ** 2 + dy ** 2
+
+            fhsq = h[i] ** 2
+            if dist < fhsq:
+                neigh[j] = i
+                j += 1
+
+    else:
+        fhsq = h ** 2
+        for i in range(x.shape[0]):
 
             dx, dy = get_dx(x0, x[i], y0, y[i], L=L, periodic=periodic)
 
@@ -87,69 +126,32 @@ def find_neighbours(ind, x, y, h, fact=1.0, L: tuple = (1.0, 1.0), periodic=True
                 neigh[j] = i
                 j += 1
 
-        return neigh[:j]
-
-    else:
-        neigh = [i for i in range(x.shape[0])]
-        neigh.remove(ind)
-        return neigh
+    return neigh[:j]
 
 
-def find_neighbours_arbitrary_x(
-    x0, y0, x, y, h, fact=1.0, L: tuple = (1.0, 1.0), periodic=True
-):
+def V(ind: int, m: np.ndarray, rho: np.ndarray):
     """
-    Find indices of all neighbours around position x0, y0
-    within fact*h (where kernel != 0)
-    x, y, h:    arrays of positions/h of all particles
-    fact:       kernel support radius factor: W = 0 for r > fact*h
-    L:          boxsize
-    periodic:   Whether you assume periodic boundary conditions
+    Volume estimate for particle with index ind.
 
-    returns list of neighbour indices
-    """
+    Paramters
+    ---------
 
-    # None for Gaussian
-    if fact is not None:
-        neigh = [None for i in x]
-        j = 0
+    ind: int
+        particle index to work for
 
-        if isinstance(h, np.ndarray):
-            fsq = fact * fact
+    m: np.ndarray
+        array of all particle masses
 
-            for i in range(x.shape[0]):
+    rho: np.ndarray
+        array of all particle densities
 
-                dx, dy = get_dx(x0, x[i], y0, y[i], L=L, periodic=periodic)
+    
+    Returns
+    -------
 
-                dist = dx ** 2 + dy ** 2
+    V: float
+        associated particle volume
 
-                fhsq = h[i] * h[i] * fsq
-                if dist < fhsq:
-                    neigh[j] = i
-                    j += 1
-
-        else:
-            fhsq = fact * fact * h * h
-            for i in range(x.shape[0]):
-
-                dx, dy = get_dx(x0, x[i], y0, y[i], L=L, periodic=periodic)
-
-                dist = dx ** 2 + dy ** 2
-
-                if dist < fhsq:
-                    neigh[j] = i
-                    j += 1
-
-        return neigh[:j]
-
-    else:
-        neigh = [i for i in range(x.shape[0])]
-        return neigh
-
-
-def V(ind, m, rho):
-    """
-    Volume estimate for particle with index ind
     """
     V = m[ind] / rho[ind]
     if V > 1:
@@ -161,22 +163,50 @@ def V(ind, m, rho):
     return V
 
 
-def find_central_particle(L, ids):
+def find_central_particle(L: List, ids: np.ndarray):
     """
     Find the index of the central particle at (0.5, 0.5)
-    assumes Lx = Ly = L
+
+    Parameters
+    ----------
+
+    L: tuple
+        Boxlen
+
+    ids: np.ndarray
+        particle IDs
+    
+
+    Returns
+    -------
+
+    cind: int
+        index of central particle
     """
 
-    i = L // 2 - 1
-    cid = i * L + i + 1
+    i = L[0] // 2 - 1
+    j = L[1] // 2 - 1
+    cid = i * L + j + 1
     cind = np.asscalar(np.where(ids == cid)[0])
 
     return cind
 
 
-def find_added_particle(ids):
+def find_added_particle(ids: np.ndarray):
     """
-    Find the index of the added particle (has highest ID)
+    Find the index of the added particle (has highest ID).
+
+    Parameters
+    ----------
+
+    ids: np.ndarray
+        particle IDs
+
+    Returns
+    -------
+
+    pind: int
+        index of added particle
     """
 
     pid = ids.shape[0]
@@ -196,9 +226,34 @@ def get_dx(
 ):
     """
     Compute difference of vectors [x1 - x2, y1 - y2] while
-    checking for periodicity if necessary
-    L:          boxsize
-    periodic:   whether to assume periodic boundaries
+    checking for periodicity if necessary.
+
+    Parameters
+    ----------
+    x1: float
+        x position of particle 1
+
+    x2: float
+        x position of particle 2
+
+    y1: float
+        y position of particle 1
+
+    y2: float
+        y position of particle 2
+
+    L: tuple
+        boxsize
+
+    periodic: bool
+        whether to assume periodic boundaries
+
+    
+    Returns
+    -------
+
+    dx: Tuple
+        Tuple (dx, dy) particle difference
     """
     dx = x1 - x2
     dy = y1 - y2
@@ -217,15 +272,14 @@ def get_dx(
         elif dy < -Lyhalf:
             dy += L[1]
 
-    return dx, dy
+    return List(dx, dy)
 
 
-def get_neighbour_data_for_all(x, y, h, fact=1.0, L: tuple = (1.0, 1.0), periodic=True):
+def get_neighbour_data_for_all(x, y, h, L: List = (1.0, 1.0), periodic=True):
     """
     Gets all the neighbour data for all particles ready.
     Assumes domain is a rectangle with boxsize L[0], L[1].
     x, y, h:    arrays of positions/h of all particles
-    fact:       kernel support radius factor: W = 0 for r > fact*h
     L:          boxsize. List/Array or scalar.
     periodic:   Whether you assume periodic boundary conditions
 
@@ -342,7 +396,7 @@ def get_neighbour_data_for_all(x, y, h, fact=1.0, L: tuple = (1.0, 1.0), periodi
 
         N = ncell.npart
 
-        fhsq = hh * hh * fact * fact
+        fhsq = hh ** 2
 
         for c, cp in enumerate(ncell.parts[:N]):
             if cp == p:
@@ -520,15 +574,13 @@ def get_neighbour_data_for_all_naive(
     x: np.ndarray,
     y: np.ndarray,
     h: np.ndarray,
-    fact: float = 1.0,
-    L: tuple = (1.0, 1.0),
+    L: List = (1.0, 1.0),
     periodic: bool = True,
 ):
     """
     Gets all the neighbour data for all particles ready.
     Naive way: Loop over all particles for each particle
     x, y, h:    arrays of positions/h of all particles
-    fact:       kernel support radius factor: W = 0 for r > fact*h
     L:          boxsize
     periodic:   Whether you assume periodic boundary conditions
 
@@ -551,7 +603,7 @@ def get_neighbour_data_for_all_naive(
     # find and store all neighbours;
     neighbours = [[] for i in x]
     for i in range(npart):
-        neighbours[i] = find_neighbours(i, x, y, h, fact=fact, L=L, periodic=periodic)
+        neighbours[i] = find_neighbours(i, x, y, h, L=L, periodic=periodic)
 
     # get neighbour counts array
     nneigh = np.zeros((npart), dtype=np.int)

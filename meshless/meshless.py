@@ -13,9 +13,8 @@
 ###########################################################################################
 
 """
-A module containing common routines for
-the meshless effective area visualisiation
-with 2d datasets
+A module containing common routines for the meshless effective area 
+visualisiation with 2d datasets.
 """
 
 try:
@@ -23,6 +22,7 @@ try:
     from .kernels import *
     from .particles import *
     from .optional_packages import jit, prange, List
+    from typing import Union
 except ImportError:
     # in case you're not using it as a package, but directly in the pythonpath
     from meshlessio import *
@@ -37,34 +37,60 @@ my_float = np.float64
 
 
 def Aij_Hopkins(
-    pind,
-    x,
-    y,
-    h,
-    m,
-    rho,
+    pind: int,
+    x: np.ndarray,
+    y: np.ndarray,
+    h: np.ndarray,
+    m: np.ndarray,
+    rho: np.ndarray,
     kernel="cubic_spline",
-    fact=1.0,
     L: List = (1.0, 1.0),
     periodic=True,
 ):
     """
     Compute A_ij as defined by Hopkins 2015
-    pind:           particle index for which to work with. (The i in A_ij)
-    x, y, m, rho:   full data arrays as read in from hdf5 file
-    h:              kernel support radius array
-    kernel:         which kernel to use
-    fact:           factor for h for limit of neighbour search; neighbours are closer than fact*h
-    L:              boxsize
-    periodic:       whether to assume periodic boundaries
 
-    returns:
-        A_ij: array of A_ij, containing x and y component for every neighbour j of particle i
+    Parameters
+    ----------
+
+    pind:   int
+        particle index that you want solution for
+
+    x: numpy.ndarray
+        particle x positions
+
+    y: numpy.ndarray
+        particle y positions
+
+    m: numpy.ndarray
+        particle masses
+
+    rho: numpy.ndarray
+        particle densities
+
+    h: numpy.ndarray
+        kernel support radii
+
+    kernel: str
+        which kernel to use
+
+    L: Tuple
+        boxsize
+
+    periodic: bool
+        whether to assume periodic boundaries
+
+
+    Returns
+    -------
+
+    A_ij: np.ndarray
+        array of A_ij, containing x and y component for every neighbour j of particle i
     """
 
     debug = False
 
-    nbors = find_neighbours(pind, x, y, h, fact=fact, L=L, periodic=periodic)
+    nbors = find_neighbours(pind, x, y, h, L=L, periodic=periodic)
 
     xj = x[nbors]
     yj = y[nbors]
@@ -76,7 +102,7 @@ def Aij_Hopkins(
 
     # compute psi_j(x_i)
     psi_j = compute_psi(
-        x[pind], y[pind], xj, yj, h[pind], kernel, fact=fact, L=L, periodic=periodic
+        x[pind], y[pind], xj, yj, h[pind], kernel, L=L, periodic=periodic
     )
 
     # normalize psi_j
@@ -105,12 +131,12 @@ def Aij_Hopkins(
 
     for i, n in enumerate(nbors):
         # first compute all psi(xj) from neighbour's neighbours to get weight omega
-        nneigh = find_neighbours(n, x, y, h, fact=fact, L=L, periodic=periodic)
+        nneigh = find_neighbours(n, x, y, h, L=L, periodic=periodic)
         xk = x[nneigh]
         yk = y[nneigh]
         for j, nn in enumerate(nneigh):
             psi_k = compute_psi(
-                x[n], y[n], xk, yk, h[n], kernel, fact=fact, L=L, periodic=periodic
+                x[n], y[n], xk, yk, h[n], kernel, L=L, periodic=periodic
             )
             if (
                 nn == pind
@@ -144,29 +170,47 @@ def Aij_Hopkins(
 
 
 def Aij_Hopkins_v2(
-    pind,
-    x,
-    y,
-    h,
-    m,
-    rho,
-    kernel="cubic_spline",
-    fact=1.0,
-    L: List = (1.0, 1.0),
-    periodic=True,
+    pind, x, y, h, m, rho, kernel="cubic_spline", L: List = (1.0, 1.0), periodic=True,
 ):
     """
     Compute A_ij as defined by Hopkins 2015, second version
-    pind:           particle index for which to work for (The i in A_ij)
-    x, y, m, rho:   full data arrays as read in from hdf5 file
-    h:              kernel support radius array
-    kernel:         which kernel to use
-    fact:           factor for h for limit of neighbour search; neighbours are closer than fact*h
-    L:              boxsize
-    periodic:       whether to assume periodic boundaries
 
-    returns:
-        A_ij: array of A_ij, containing x and y component for every neighbour j of particle i
+    Parameters
+    ----------
+
+    pind:   int
+        particle index that you want solution for
+
+    x: numpy.ndarray
+        particle x positions
+
+    y: numpy.ndarray
+        particle y positions
+
+    m: numpy.ndarray
+        particle masses
+
+    rho: numpy.ndarray
+        particle densities
+
+    h: numpy.ndarray
+        kernel support radii
+
+    kernel: str
+        which kernel to use
+
+    L: Tuple
+        boxsize
+
+    periodic: bool
+        whether to assume periodic boundaries
+
+
+    Returns
+    -------
+
+    A_ij: np.ndarray
+        array of A_ij, containing x and y component for every neighbour j of particle i
     """
 
     npart = x.shape[0]
@@ -180,15 +224,7 @@ def Aij_Hopkins_v2(
         for l in range(npart):
             # kernels are symmetric in x_i, x_j, but h can vary!!!!
             psi_k_at_l[k, l] = psi(
-                x[l],
-                y[l],
-                x[k],
-                y[k],
-                h[l],
-                kernel=kernel,
-                fact=fact,
-                L=L,
-                periodic=periodic,
+                x[l], y[l], x[k], y[k], h[l], kernel=kernel, L=L, periodic=periodic,
             )
 
     neighbours = [[] for i in x]
@@ -197,7 +233,7 @@ def Aij_Hopkins_v2(
     for l in range(npart):
 
         # find and store all neighbours;
-        neighbours[l] = find_neighbours(l, x, y, h, fact=fact, L=L, periodic=periodic)
+        neighbours[l] = find_neighbours(l, x, y, h, L=L, periodic=periodic)
 
         # compute normalisation omega for all particles
         # needs psi_k_at_l to be computed already
@@ -249,7 +285,6 @@ def Aij_Ivanova_all(
     m: np.ndarray,
     rho: np.ndarray,
     kernel: str = "cubic_spline",
-    fact: float = 1.0,
     L: List = (1.0, 1.0),
     periodic: bool = True,
 ):
@@ -260,23 +295,46 @@ def Aij_Ivanova_all(
     This function computes the effective surfaces of all particles for all their
     respective neighbours.
 
-    x, y, m, rho:   full data arrays as read in from hdf5 file
-    h:              kernel support radius array
-    kernel:         which kernel to use
-    fact:           factor for h for limit of neighbour search; neighbours are closer than fact*h
-    L:              boxsize
-    periodic:       whether to assume periodic boundaries
+    Parameters
+    ----------
+    x: numpy.ndarray
+        particle x positions
 
-    returns:
-        A_ij:       array of A_ij, containing x and y component for every neighbour j of every particle i
-                    !! important: indices i and j are switched compared to definition in Ivanova 2013
-        neighbours: list of lists of neighbour indices for every particle i
+    y: numpy.ndarray
+        particle y positions
+
+    m: numpy.ndarray
+        particle masses
+
+    rho: numpy.ndarray
+        particle densities
+
+    h: numpy.ndarray
+        kernel support radii
+
+    kernel: str
+        which kernel to use
+
+    L: Tuple
+        boxsize
+
+    periodic: bool
+        whether to assume periodic boundaries
+
+
+    Returns
+    -------
+
+    A_ij: np.ndarray
+        array of A_ij, containing x and y component for every neighbour j of every particle i
+        ! important: indices i and j are switched compared to definition in Ivanova 2013
+
+    neighbours: list 
+        list of lists of neighbour indices for every particle i
     """
 
     # first get neighbour data
-    neighbour_data = get_neighbour_data_for_all(
-        x, y, h, fact=fact, L=L, periodic=periodic
-    )
+    neighbour_data = get_neighbour_data_for_all(x, y, h, L=L, periodic=periodic)
 
     maxneigh = neighbour_data.maxneigh
     neighbours = neighbour_data.neighbours
@@ -302,28 +360,17 @@ def Aij_Ivanova_all(
                 y[ind_n],
                 h[j],
                 kernel=kernel,
-                fact=fact,
                 L=L,
                 periodic=periodic,
             )
             omega[j] += W_j_at_i[j, i]
 
         # add self-contribution
-        omega[j] += psi(
-            0.0, 0.0, 0.0, 0.0, h[j], kernel=kernel, fact=fact, L=L, periodic=periodic
-        )
+        omega[j] += psi(0.0, 0.0, 0.0, 0.0, h[j], kernel=kernel, L=L, periodic=periodic)
 
     # get gradients
     grad_psi_j_at_i = get_grad_psi_j_at_i_analytical(
-        x,
-        y,
-        h,
-        omega,
-        W_j_at_i,
-        neighbour_data,
-        kernel=kernel,
-        fact=fact,
-        periodic=periodic,
+        x, y, h, omega, W_j_at_i, neighbour_data, kernel=kernel, periodic=periodic,
     )
 
     maxn = max([len(n) for n in neighbours])
@@ -375,7 +422,6 @@ def Aij_Ivanova(
     m: np.ndarray,
     rho: np.ndarray,
     kernel="cubic_spline",
-    fact: float = 1.0,
     L: List = (1.0, 1.0),
     periodic: bool = True,
 ):
@@ -384,25 +430,50 @@ def Aij_Ivanova(
     expansion as Hopkins does it. Use analytical expressions for the
     gradient of the kernels instead of the matrix representation.
 
-    pind:           particle index for which to work for (The i in A_ij)
-    x, y, m, rho:   full data arrays as read in from hdf5 file
-    h:              kernel support radius array
-    kernel:         which kernel to use
-    fact:           factor for h for limit of neighbour search; neighbours are closer than fact*h
-    L:              boxsize
-    periodic:       whether to assume periodic boundaries
 
-    returns:
-        A_ij: array of A_ij, containing x and y component for every neighbour j of particle i
-            !! important: indices i and j are switched compared to definition in Ivanova 2013
+    Parameters
+    ----------
+
+    pind:   int
+        particle index that you want solution for
+
+    x: numpy.ndarray
+        particle x positions
+
+    y: numpy.ndarray
+        particle y positions
+
+    m: numpy.ndarray
+        particle masses
+
+    rho: numpy.ndarray
+        particle densities
+
+    h: numpy.ndarray
+        kernel support radii
+
+    kernel: str
+        which kernel to use
+
+    L: Tuple
+        boxsize
+
+    periodic: bool
+        whether to assume periodic boundaries
+
+
+    Returns
+    -------
+
+    A_ij: np.ndarray
+        array of A_ij, containing x and y component for every neighbour j of particle i
+        !! important: indices i and j are switched compared to definition in Ivanova 2013
     """
 
     npart = x.shape[0]
 
     # first get neighbour data
-    neighbour_data = get_neighbour_data_for_all(
-        x, y, h, fact=fact, L=L, periodic=periodic
-    )
+    neighbour_data = get_neighbour_data_for_all(x, y, h, L=L, periodic=periodic)
 
     maxneigh = neighbour_data.maxneigh
     neighbours = neighbour_data.neighbours
@@ -426,28 +497,17 @@ def Aij_Ivanova(
                 y[j],
                 h[ind_n],
                 kernel=kernel,
-                fact=fact,
                 L=L,
                 periodic=periodic,
             )
             omega[ind_n] += W_j_at_i[j, i]
 
         # add self-contribution
-        omega[j] += psi(
-            0.0, 0.0, 0.0, 0.0, h[j], kernel=kernel, fact=fact, L=L, periodic=periodic
-        )
+        omega[j] += psi(0.0, 0.0, 0.0, 0.0, h[j], kernel=kernel, L=L, periodic=periodic)
 
     # get gradients
     grad_psi_j_at_i = get_grad_psi_j_at_i_analytical(
-        x,
-        y,
-        h,
-        omega,
-        W_j_at_i,
-        neighbour_data,
-        kernel=kernel,
-        fact=fact,
-        periodic=periodic,
+        x, y, h, omega, W_j_at_i, neighbour_data, kernel=kernel, periodic=periodic,
     )
 
     # now compute A_ij for all neighbours j of i
@@ -482,11 +542,48 @@ def Aij_Ivanova(
 
 
 @jit(nopython=True)
-def x_ij(pind, x, y, h, nbors=None, which=None):
+def x_ij(
+    pind: int,
+    x: np.ndarray,
+    y: np.ndarray,
+    h: np.ndarray,
+    nbors: Union[List, None] = None,
+    which: Union[int, None] = None,
+):
     """
-    compute x_ij for all neighbours of particle with index pind
-    if which=integer is given, instead compute only for specific particle
-    where which= that particle's ID
+    compute x_ij for all neighbours of particle with index pind.
+    If `which` is given, instead compute only for specific particle
+    where `which` is that particle's index.
+
+    Parameters
+    ----------
+
+    pind: int
+        particle index that you want solution for
+
+    x: numpy.ndarray
+        particle x positions
+
+    y: numpy.ndarray
+        particle y positions
+
+    h: numpy.ndarray
+        kernel support radii
+
+    nbors: list or None
+        list of particle with index `pind`'s neighbours.
+        If `which` is `None`, `nbors` must be provided.
+
+    which: int or None
+        for which part
+
+
+    Returns
+    -------
+    
+    x_ij: np.ndarray
+        array of particle x_ij's. Is always 2D.
+
     """
 
     if which is not None:
@@ -510,8 +607,9 @@ def x_ij(pind, x, y, h, nbors=None, which=None):
         return x_ij
 
     else:
-        print("Gotta give me a list of neighbours or a single particle info for x_ij")
-        quit()
+        raise ValueError(
+            "Gotta give me either a list of neighbours or a single particle info for x_ij"
+        )
 
     return
 
@@ -525,24 +623,48 @@ def get_grad_psi_j_at_i_analytical(
     W_j_at_i: np.ndarray,
     neighbour_data,
     kernel="cubic_spline",
-    fact: float = 1.0,
     L: List = (1.0, 1.0),
     periodic: bool = True,
 ):
     """
     Compute \nabla \psi_k (x_l) for all particles k and l
-    x, y, h:        arrays of positions and compact support radius of all particles
-    omega:          weights; sum_j W(x - xj) for all particles x=x_k
-    W_j_at_i:       W_k(x_l) npart x npart array
-    neighbour_data: neighbour_data object. See function get_neighbour_data_for_all
-    kernel:         which kernel to use
-    fact:           factor for h for limit of neighbour search; neighbours are closer than fact*h
-    L:              boxsize
-    periodic:       whether to assume periodic boundaries
 
-    returns:
+    Parameters
+    ----------
 
-        grad_psi_j_at_i: npart x max_neigh x 2 array; grad psi_j (x_i) for all i,j for both x and y direction
+    pind:   int
+        particle index that you want solution for
+
+    x: numpy.ndarray
+        particle x positions
+
+    y: numpy.ndarray
+        particle y positions
+
+    h: numpy.ndarray
+        kernel support radii
+
+    kernel: str
+        which kernel to use
+
+    W_j_at_i: np.ndarray
+        W_k(x_l) : npart x npart array
+
+    neighbour_data: 
+        neighbour_data object. See function get_neighbour_data_for_all
+
+    L: Tuple
+        boxsize
+
+    periodic: bool
+        whether to assume periodic boundaries
+
+
+    Returns
+    -------
+
+    grad_psi_j_at_i: np.ndarray
+        npart x max_neigh x 2 array; grad psi_j (x_i) for all i,j for both x and y direction
     """
 
     npart = x.shape[0]
@@ -585,118 +707,55 @@ def get_grad_psi_j_at_i_analytical(
     return grad_psi_j_at_i
 
 
-def get_grad_psi_j_at_i_analytical_old(
-    x,
-    y,
-    h,
-    omega,
-    W_j_at_i,
-    neighbour_data,
-    kernel="cubic_spline",
-    fact=1.0,
-    L: List = (1.0, 1.0),
-    periodic=True,
-):
-    """
-    Compute \nabla \psi_k (x_l) for all particles k and l
-    x, y, h:        arrays of positions and compact support radius of all particles
-    omega:          weights; sum_j W(x - xj) for all particles x=x_k
-    W_j_at_i:       W_k(x_l) npart x npart array
-    neighbour_data: neighbour_data object. See function get_neighbour_data_for_all
-    kernel:         which kernel to use
-    fact:           factor for h for limit of neighbour search; neighbours are closer than fact*h
-    L:              boxsize
-    periodic:       whether to assume periodic boundaries
-
-    returns:
-
-        grad_psi_j_at_i: npart x max_neigh x 2 array; grad psi_j (x_i) for all i,j for both x and y direction
-    """
-
-    npart = x.shape[0]
-    maxneigh = neighbour_data.maxneigh
-    neighbours = neighbour_data.neighbours
-    nneigh = neighbour_data.nneigh
-    iinds = neighbour_data.iinds
-
-    # gradient of psi_j at neighbour i's position
-    grad_psi_j_at_i = np.zeros((npart, maxneigh, 2), dtype=my_float)
-    # gradient of W_j at neighbour i's position
-    grad_W_j_at_i = np.zeros((npart, maxneigh, 2), dtype=my_float)
-    # gradient sum for the same h_i
-    sum_grad_W = np.zeros((npart, 2), dtype=my_float)
-
-    #  old version
-    #  for i in range(npart):
-    #      for j, jind in enumerate(neighbours[i]):
-    #          dx, dy = get_dx(x[i], x[jind], y[i], y[jind], L=L, periodic=periodic)
-    #          r = np.sqrt(dx**2 + dy**2)
-    #
-    #          dwdr = dWdr(r/h[i], h[i], kernel)
-    #          iind = iinds[i, j]
-    #
-    #          grad_W_j_at_i[jind, iind, 0] = dwdr * dx / r
-    #          grad_W_j_at_i[jind, iind, 1] = dwdr * dy / r
-    #
-    #          sum_grad_W[i] += grad_W_j_at_i[jind, iind]
-
-    for j in range(npart):
-        for i, ind_n in enumerate(neighbours[j]):
-            dx, dy = get_dx(x[ind_n], x[j], y[ind_n], y[j], L=L, periodic=periodic)
-            r = np.sqrt(dx ** 2 + dy ** 2)
-
-            dwdr = dWdr(r / h[ind_n], h[ind_n], kernel)
-
-            grad_W_j_at_i[j, i, 0] = dwdr * dx / r
-            grad_W_j_at_i[j, i, 1] = dwdr * dy / r
-
-            # now compute the term needed for the gradient sum need to do it separately: if i is neighbour of j,
-            # but j is not neighbour of i, then j's contribution will be missed
-            # minus: inverse dx, dy
-            dwdr = dWdr(r / h[j], h[j], kernel)
-            sum_grad_W[j] -= dwdr * np.array([dx, dy]) / r
-
-    # finish computing the gradients: Need W(r, h), which is currently stored as psi
-    for j in range(npart):
-        for i, ind_n in enumerate(neighbours[j]):
-            grad_psi_j_at_i[j, i, 0] = (
-                grad_W_j_at_i[j, i, 0] / omega[ind_n]
-                - W_j_at_i[j, i] * sum_grad_W[ind_n, 0] / omega[ind_n] ** 2
-            )
-            grad_psi_j_at_i[j, i, 1] = (
-                grad_W_j_at_i[j, i, 1] / omega[ind_n]
-                - W_j_at_i[j, i] * sum_grad_W[ind_n, 1] / omega[ind_n] ** 2
-            )
-
-    del grad_W_j_at_i, sum_grad_W
-
-    return grad_psi_j_at_i
-
-
 @jit(nopython=True, fastmath=True)
 def compute_psi(
     xi: float,
     yi: float,
     xj: np.ndarray,
     yj: np.ndarray,
-    h: np.ndarray,
-    kernel="cubic_spline",
-    fact: float = 1.0,
+    h: Union[float, np.ndarray],
+    kernel: str = "cubic_spline",
     L: List = (1.0, 1.0),
     periodic: bool = True,
 ):
     """
-    Compute all psi_j(x_i)
-    xi, yi:     floats; position for which to compute psi's
-    xj, yj:     arrays of neighbour's positions
-    h:          float; smoothing length at position xi, yi
-            or array of h for xj, yj [used to compute h(x)]
-    kernel:     which kernel to use
-    fact:       factor for h for limit of neighbour search; neighbours are closer than fact*h
-    L:          boxsize
-    periodic:   whether to assume periodic boundaries
+    Compute psi_j(x_i) for all j
 
-    return numpy array of psi_j(x)
+
+    Parameters
+    ----------
+    
+    xi: float
+        x position of particle i
+
+    yi: float
+        y position of particle i
+
+    xj: np.ndarray
+        x positions of particles j
+
+    yj: np.ndarray
+        y positions of particles j
+
+    h: float or np.ndarray
+        smoothing length at position xi, yi
+        or array of h for xj, yj [used to compute h(x)]
+
+    kernel: str
+        which kernel to use
+
+    L: Tuple
+        boxsize
+
+    periodic: bool
+        whether to assume periodic boundaries
+
+
+    Returns
+    -------
+
+    psi_j: np.ndarray
+        numpy array of psi_j(x)
     """
 
     psi_j = np.zeros(xj.shape[0], dtype=my_float)
@@ -704,29 +763,13 @@ def compute_psi(
     if isinstance(h, np.ndarray):
         for i in range(xj.shape[0]):
             psi_j[i] = psi(
-                xi,
-                yi,
-                xj[i],
-                yj[i],
-                h[i],
-                kernel=kernel,
-                fact=fact,
-                L=L,
-                periodic=periodic,
+                xi, yi, xj[i], yj[i], h[i], kernel=kernel, L=L, periodic=periodic,
             )
 
     else:
         for i in range(xj.shape[0]):
             psi_j[i] = psi(
-                xi,
-                yi,
-                xj[i],
-                yj[i],
-                h,
-                kernel=kernel,
-                fact=fact,
-                L=L,
-                periodic=periodic,
+                xi, yi, xj[i], yj[i], h, kernel=kernel, L=L, periodic=periodic,
             )
 
     return psi_j
@@ -740,7 +783,6 @@ def psi(
     yi: float,
     h: float,
     kernel: str = "cubic_spline",
-    fact: float = 1.0,
     L: List = (1.0, 1.0),
     periodic: bool = True,
 ):
@@ -750,18 +792,45 @@ def psi(
 
     i.e. psi_i(x) = W([x - xi, y - yi], h(x))
 
-    kernel:     which kernel to use
-    fact:       factor to increase h with
-    L:          boxsize
-    periodic:   Whether you assume periodic boundary conditions
 
-    !!!! returns type my_float!
-    Needed to prevent precision errors for normalisation
+    Parameter
+    ---------
+
+    x: float
+        particle x position
+
+    y: float
+        particle y position
+
+    xi: float
+        particle xi position
+
+    yi: float
+        particle yi position
+
+    h: float
+        kernel support radius at position (x, y)
+
+    kernel: str
+        which kernel to use
+
+    L: Tuple
+        boxsize
+
+    periodic: bool
+        whether to assume periodic boundaries
+
+
+    Returns
+    -------
+    psi_i: my_float
+        !!!! returns type my_float!
+        Needed to prevent precision errors for normalisation
     """
 
     dx, dy = get_dx(x, xi, y, yi, L=L, periodic=periodic)
 
-    q = my_float(np.sqrt(dx ** 2 + dy ** 2) / (fact * h))
+    q = my_float(np.sqrt(dx ** 2 + dy ** 2) / h)
 
     return W(q, h, kernel)
 
@@ -773,17 +842,41 @@ def get_matrix(
     xj: np.ndarray,
     yj: np.ndarray,
     psi_j: np.ndarray,
-    L: float = 1,
+    L: List = (1.0, 1.0),
     periodic: bool = True,
 ):
     """
     Get B_i ^{alpha beta}
 
-    xi, yi:         floats; Evaluate B at this position
-    xj, yj:         arrays; Neighbouring points
-    psi_j:          array;  volume fraction of neighbours at position x_i; psi_j(x_i)
-    L:              boxsize
-    periodic:       whether to assume periodic boundaries
+    Parameters
+    ----------
+    
+    xi: float
+        x position of particle i
+
+    yi: float
+        y position of particle i
+
+    xj: np.ndarray
+        x positions of particles j
+
+    yj: np.ndarray
+        y positions of particles j
+
+    psi_j: np.ndarray  
+        volume fraction of neighbours at position x_i; psi_j(x_i)
+ 
+    L: Tuple
+        boxsize
+
+    periodic: bool
+        whether to assume periodic boundaries
+
+
+    Returns
+    -------
+    B: np.matrix
+        2 x 2 matrix
     """
 
     dx = np.zeros(xj.shape[0])
@@ -821,7 +914,6 @@ def h_of_x(
     m: np.ndarray,
     rho: np.ndarray,
     kernel="cubic_spline",
-    fact: float = 1.0,
     L: List = (1.0, 1.0),
     periodic: bool = True,
 ):
@@ -830,23 +922,54 @@ def h_of_x(
     not necessariliy a particle
     by approximating it as h(x) = sum_j h_j * psi_j(x)
 
-    x, y, h :   full particle arrays
-    fact:       factor to increase h with
-    L:          boxsize
-    periodic:   whether to assume periodic boundaries
+
+    Parameters
+    ----------
+
+    xx: float
+        x position to compute for
+
+    yy: float
+        y position to compute for
+
+    x: numpy.ndarray
+        particle x positions
+
+    y: numpy.ndarray
+        particle y positions
+
+    h: numpy.ndarray
+        kernel support radii
+
+    m: numpy.ndarray
+        particle masses
+
+    rho: numpy.ndarray
+        particle densities
+
+    kernel: str
+        which kernel to use
+
+    L: Tuple
+        boxsize
+
+    periodic: bool
+
+
+    Returns
+    -------
+
+    hh: float
+        smoothing length at position (xx, yy)
     """
 
-    nbors = find_neighbours_arbitrary_x(
-        xx, yy, x, y, h, fact=fact, L=L, periodic=periodic
-    )
+    nbors = find_neighbours_arbitrary_x(xx, yy, x, y, h, L=L, periodic=periodic)
 
     xj = x[nbors]
     yj = y[nbors]
     hj = h[nbors]
 
-    psi_j = compute_psi(
-        xx, yy, xj, yj, hj, kernel=kernel, fact=fact, L=L, periodic=periodic
-    )
+    psi_j = compute_psi(xx, yy, xj, yj, hj, kernel=kernel, L=L, periodic=periodic)
     psi_j /= np.sum(psi_j)
 
     hh = np.sum(hj * psi_j)
