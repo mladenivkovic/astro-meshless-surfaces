@@ -13,11 +13,10 @@
 ###########################################################################################
 
 import numpy as np
+from .optional_packages import jit, List
 
 
-# ===============================================
 def find_index(x, y, pcoord, tolerance=1e-3):
-    # ===============================================
     """
     Find the index in the read-in arrays where
     the particle with coordinates of your choice is
@@ -37,9 +36,7 @@ def find_index(x, y, pcoord, tolerance=1e-3):
     return pind
 
 
-# ===============================================
 def find_index_by_id(ids, id_to_look_for):
-    # ===============================================
     """
     Find the index in the read-in arrays where
     the particle with id_to_look_for is
@@ -57,9 +54,7 @@ def find_index_by_id(ids, id_to_look_for):
     return pind
 
 
-# ================================================================
-def find_neighbours(ind, x, y, h, fact=1.0, L=1.0, periodic=True):
-    # ================================================================
+def find_neighbours(ind, x, y, h, fact=1.0, L: tuple = (1.0, 1.0), periodic=True):
     """
     Find indices of all neighbours of a particle with index ind
     within fact*h (where kernel != 0)
@@ -100,9 +95,9 @@ def find_neighbours(ind, x, y, h, fact=1.0, L=1.0, periodic=True):
         return neigh
 
 
-# =================================================================================
-def find_neighbours_arbitrary_x(x0, y0, x, y, h, fact=1.0, L=1.0, periodic=True):
-    # =================================================================================
+def find_neighbours_arbitrary_x(
+    x0, y0, x, y, h, fact=1.0, L: tuple = (1.0, 1.0), periodic=True
+):
     """
     Find indices of all neighbours around position x0, y0
     within fact*h (where kernel != 0)
@@ -152,9 +147,7 @@ def find_neighbours_arbitrary_x(x0, y0, x, y, h, fact=1.0, L=1.0, periodic=True)
         return neigh
 
 
-# ===================
 def V(ind, m, rho):
-    # ===================
     """
     Volume estimate for particle with index ind
     """
@@ -168,9 +161,7 @@ def V(ind, m, rho):
     return V
 
 
-# ======================================
 def find_central_particle(L, ids):
-    # ======================================
     """
     Find the index of the central particle at (0.5, 0.5)
     assumes Lx = Ly = L
@@ -183,9 +174,7 @@ def find_central_particle(L, ids):
     return cind
 
 
-# ======================================
 def find_added_particle(ids):
-    # ======================================
     """
     Find the index of the added particle (has highest ID)
     """
@@ -196,9 +185,15 @@ def find_added_particle(ids):
     return pind
 
 
-# =====================================================
-def get_dx(x1, x2, y1, y2, L=1.0, periodic=True):
-    # =====================================================
+@jit()
+def get_dx(
+    x1: float,
+    x2: float,
+    y1: float,
+    y2: float,
+    L: List = (1.0, 1.0),
+    periodic: bool = True,
+):
     """
     Compute difference of vectors [x1 - x2, y1 - y2] while
     checking for periodicity if necessary
@@ -210,14 +205,8 @@ def get_dx(x1, x2, y1, y2, L=1.0, periodic=True):
 
     if periodic:
 
-        if hasattr(L, "__len__"):
-            Lxhalf = L[0] / 2.0
-            Lyhalf = L[1] / 2.0
-        else:
-            Lxhalf = L / 2.0
-            Lyhalf = L / 2.0
-            L = [L, L]
-
+        Lxhalf = L[0] * 0.5
+        Lyhalf = L[1] * 0.5
         if dx > Lxhalf:
             dx -= L[0]
         elif dx < -Lxhalf:
@@ -231,9 +220,7 @@ def get_dx(x1, x2, y1, y2, L=1.0, periodic=True):
     return dx, dy
 
 
-# ========================================================================
-def get_neighbour_data_for_all(x, y, h, fact=1.0, L=1.0, periodic=True):
-    # ========================================================================
+def get_neighbour_data_for_all(x, y, h, fact=1.0, L: tuple = (1.0, 1.0), periodic=True):
     """
     Gets all the neighbour data for all particles ready.
     Assumes domain is a rectangle with boxsize L[0], L[1].
@@ -261,18 +248,16 @@ def get_neighbour_data_for_all(x, y, h, fact=1.0, L=1.0, periodic=True):
     if not hasattr(L, "__len__"):
         L = [L, L]
 
-    # -----------------------------------------------
     class neighbour_data:
-        # -----------------------------------------------
         def __init__(self, neighbours=None, maxneigh=None, nneigh=None, iinds=None):
             self.neighbours = neighbours
             self.maxneigh = maxneigh
             self.nneigh = nneigh
             self.iinds = iinds
 
-    # -----------------------------------------------
-    class cell:
         # -----------------------------------------------
+
+    class cell:
         """
         A cell object to store particles in.
         Stores particle indexes, positions, compact support radii
@@ -336,9 +321,9 @@ def get_neighbour_data_for_all(x, y, h, fact=1.0, L=1.0, periodic=True):
             else:
                 return False
 
-    # ---------------------------------------------------------------
+        # -----------------------------------------------
+
     def find_neighbours_in_cell(i, j, p, xx, yy, hh, is_self):
-        # ---------------------------------------------------------------
         """
         Find neighbours of a particle in the cell with indices i,j
         of the grid
@@ -377,6 +362,7 @@ def get_neighbour_data_for_all(x, y, h, fact=1.0, L=1.0, periodic=True):
                 n += 1
 
         return neigh[:n]
+        # -----------------------------------------------
 
     npart = x.shape[0]
 
@@ -529,9 +515,15 @@ def get_neighbour_data_for_all(x, y, h, fact=1.0, L=1.0, periodic=True):
     return nd
 
 
-# ===============================================================================
-def get_neighbour_data_for_all_naive(x, y, h, fact=1.0, L=1.0, periodic=True):
-    # ===============================================================================
+@jit(nopython=True)
+def get_neighbour_data_for_all_naive(
+    x: np.ndarray,
+    y: np.ndarray,
+    h: np.ndarray,
+    fact: float = 1.0,
+    L: tuple = (1.0, 1.0),
+    periodic: bool = True,
+):
     """
     Gets all the neighbour data for all particles ready.
     Naive way: Loop over all particles for each particle

@@ -13,6 +13,7 @@
 ###########################################################################################
 
 import numpy as np
+from .optional_packages import jit
 
 
 # Names of all available kernels
@@ -64,9 +65,8 @@ for i, kernel in enumerate(kernels_with_gaussian):
     kernel_H_over_h_dict[kernel] = kernel_H_over_h[i]
 
 
-# =====================================
-def W(q, h, kernel="cubic_spline"):
-    # =====================================
+@jit(nopython=True)
+def W(q: float, h: float, kernel: str = "cubic_spline"):
     """
     Various kernels
 
@@ -85,9 +85,7 @@ def W(q, h, kernel="cubic_spline"):
     """
     #  https://pysph.readthedocs.io/en/latest/reference/kernels.html#liu2010
 
-    # --------------------------------------
     if kernel == "cubic_spline":
-        # --------------------------------------
         if q < 0.5:
             res = 3 * q ** 2 * (q - 1) + 0.5
         elif q < 1:
@@ -99,10 +97,9 @@ def W(q, h, kernel="cubic_spline"):
         #  sigma = 80./(7*pi*h**2)
         sigma = 3.63782727067189 / h ** 2
         return sigma * res
-
-    # --------------------------------------
-    elif kernel == "quartic_spline":
         # --------------------------------------
+
+    elif kernel == "quartic_spline":
 
         if q < 0.2:
             res = 6 * q ** 4 - 2.4 * q ** 2 + 46 / 125
@@ -115,10 +112,9 @@ def W(q, h, kernel="cubic_spline"):
 
         sigma = 5 ** 6 * 3 / (2398 * np.pi * h ** 2)
         return sigma * res
+        # --------------------------------------
 
-    # ---------------------------------------
     elif kernel == "quintic_spline":
-        # ---------------------------------------
         if q < 0.333333333333:
             q4 = q ** 4
             res = 10 * (q ** 4 * (1 - q) - 0.2222222222 * q ** 2) + 0.2682926829268
@@ -143,10 +139,9 @@ def W(q, h, kernel="cubic_spline"):
         #  sigma = 3**7*7/(478*pi)/h**2
         sigma = 10.1945733213130 / h ** 2
         return res * sigma
+        # ---------------------------------------
 
-    # -------------------------------------
     elif kernel == "wendland_C2":
-        # -------------------------------------
 
         if q < 1:
             #  sigma = 7/(np.pi * h**2)
@@ -155,10 +150,9 @@ def W(q, h, kernel="cubic_spline"):
             return sigma * (qsq * (qsq * (4 * q - 15) + 10 * (2 * q - 1)) + 1)
         else:
             return 0
-
-    # -------------------------------------
-    elif kernel == "wendland_C4":
         # -------------------------------------
+
+    elif kernel == "wendland_C4":
 
         if q < 1:
             #  sigma = 9/(np.pi*h**2)
@@ -177,10 +171,9 @@ def W(q, h, kernel="cubic_spline"):
             )
         else:
             return 0
-
-    # -------------------------------------
-    elif kernel == "wendland_C6":
         # -------------------------------------
+
+    elif kernel == "wendland_C6":
 
         if q < 1:
             #  sigma = 78/(7*np.pi*h**2)
@@ -198,12 +191,12 @@ def W(q, h, kernel="cubic_spline"):
             )
         else:
             return 0
-
-    # -------------------------------------
-    elif kernel == "gaussian":
         # -------------------------------------
+
+    elif kernel == "gaussian":
         # gaussian without compact support
         return 1.0 / np.sqrt(np.pi) ** 3 / h ** 2 * np.exp(-(q ** 2))
+        # -------------------------------------
 
     # =================================
     # Old and unused and unscaled
@@ -235,14 +228,13 @@ def W(q, h, kernel="cubic_spline"):
     #          return 0
 
     else:
-        raise ValueError("Didn't find kernel", kernel)
+        raise ValueError("Didn't find kernel")
 
     return
 
 
-# =====================================
-def dWdr(q, h, kernel="cubic_spline"):
-    # =====================================
+@jit(nopython=True)
+def dWdr(q: float, h: float, kernel: str = "cubic_spline"):
     """
     Various gradients of kernels
 
@@ -263,9 +255,7 @@ def dWdr(q, h, kernel="cubic_spline"):
     """
     #  https://pysph.readthedocs.io/en/latest/reference/kernels.html#liu2010
 
-    # --------------------------------------
     if kernel == "cubic_spline":
-        # --------------------------------------
         if q < 0.5:
             res = 9 * q ** 2 - 6 * q
         elif q < 1:
@@ -276,10 +266,9 @@ def dWdr(q, h, kernel="cubic_spline"):
         #  sigma = 80./(7*pi*h**2) * 1 / h
         sigma = 3.63782727067189 / h ** 3
         return sigma * res
-
-    # --------------------------------------
-    elif kernel == "quartic_spline":
         # --------------------------------------
+
+    elif kernel == "quartic_spline":
 
         if q < 0.2:
             res = 24 * q ** 3 - 4.8 * q
@@ -292,10 +281,9 @@ def dWdr(q, h, kernel="cubic_spline"):
 
         sigma = 5 ** 6 * 3 / (2398 * np.pi * h ** 3)
         return sigma * res
+        # --------------------------------------
 
-    # ---------------------------------------
     elif kernel == "quintic_spline":
-        # ---------------------------------------
         if q < 0.333333333333:
             res = 40 * q ** 3 - 50 * q ** 4 - 4.44444444444 * q
         elif q < 0.666666666666:
@@ -310,14 +298,13 @@ def dWdr(q, h, kernel="cubic_spline"):
             res = 20 * q ** 3 - 5 * q ** 4 + 20 * q - 30 * q ** 2 - 5
         else:
             return 0
+        # ---------------------------------------
 
         #  sigma = 3**7*7/(478*pi)/h**2
         sigma = 10.1945733213130 / h ** 3
         return res * sigma
 
-    # -------------------------------------
     elif kernel == "wendland_C2":
-        # -------------------------------------
 
         if q < 1:
             #  sigma = 7/(np.pi * h**2)
@@ -325,10 +312,9 @@ def dWdr(q, h, kernel="cubic_spline"):
             return sigma * (20 * q ** 4 - 60 * q ** 3 + 60 * q ** 2 - 20 * q)
         else:
             return 0
-
-    # -------------------------------------
-    elif kernel == "wendland_C4":
         # -------------------------------------
+
+    elif kernel == "wendland_C4":
 
         if q < 1:
             #  sigma = 9/(np.pi*h**2)
@@ -344,10 +330,9 @@ def dWdr(q, h, kernel="cubic_spline"):
             )
         else:
             return 0
-
-    # -------------------------------------
-    elif kernel == "wendland_C6":
         # -------------------------------------
+
+    elif kernel == "wendland_C6":
 
         if q < 1:
             #  sigma = 78/(7*np.pi*h**2)
@@ -364,13 +349,12 @@ def dWdr(q, h, kernel="cubic_spline"):
             )
         else:
             return 0
+        # -------------------------------------
 
     return
 
 
-# ===================================
 def get_H(h, kernel="cubic_spline"):
-    # ===================================
     """
     Compute the smoothing length in terms of the compact support length
     of a given kernel.

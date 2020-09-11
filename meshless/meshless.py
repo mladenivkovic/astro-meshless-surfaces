@@ -12,16 +12,17 @@
 # This file is part of astro-meshless-surfaces.
 ###########################################################################################
 
-# ===========================================
-# A module containing common routines for
-# the meshless effective area visualisiation
-# with 2d datasets
-# ===========================================
+"""
+A module containing common routines for
+the meshless effective area visualisiation
+with 2d datasets
+"""
 
 try:
     from .meshlessio import *
     from .kernels import *
     from .particles import *
+    from .optional_packages import jit, prange, List
 except ImportError:
     # in case you're not using it as a package, but directly in the pythonpath
     from meshlessio import *
@@ -35,11 +36,18 @@ import numpy as np
 my_float = np.float64
 
 
-# ===========================================================================================
 def Aij_Hopkins(
-    pind, x, y, h, m, rho, kernel="cubic_spline", fact=1.0, L=1.0, periodic=True
+    pind,
+    x,
+    y,
+    h,
+    m,
+    rho,
+    kernel="cubic_spline",
+    fact=1.0,
+    L: List = (1.0, 1.0),
+    periodic=True,
 ):
-    # ===========================================================================================
     """
     Compute A_ij as defined by Hopkins 2015
     pind:           particle index for which to work with. (The i in A_ij)
@@ -135,11 +143,18 @@ def Aij_Hopkins(
     return A_ij
 
 
-# ===================================================================================================
 def Aij_Hopkins_v2(
-    pind, x, y, h, m, rho, kernel="cubic_spline", fact=1.0, L=1.0, periodic=True
+    pind,
+    x,
+    y,
+    h,
+    m,
+    rho,
+    kernel="cubic_spline",
+    fact=1.0,
+    L: List = (1.0, 1.0),
+    periodic=True,
 ):
-    # ===================================================================================================
     """
     Compute A_ij as defined by Hopkins 2015, second version
     pind:           particle index for which to work for (The i in A_ij)
@@ -227,11 +242,17 @@ def Aij_Hopkins_v2(
     return A_ij
 
 
-# ==================================================================================================
 def Aij_Ivanova_all(
-    x, y, h, m, rho, kernel="cubic_spline", fact=1.0, L=1.0, periodic=True
+    x: np.ndarray,
+    y: np.ndarray,
+    h: np.ndarray,
+    m: np.ndarray,
+    rho: np.ndarray,
+    kernel: str = "cubic_spline",
+    fact: float = 1.0,
+    L: List = (1.0, 1.0),
+    periodic: bool = True,
 ):
-    # ==================================================================================================
     """
     Compute A_ij as defined by Ivanova 2013, using the discretization by Taylor
     expansion as Hopkins does it. Use analytical expressions for the
@@ -271,7 +292,7 @@ def Aij_Ivanova_all(
     W_j_at_i = np.zeros((npart, maxneigh), dtype=np.float)
     omega = np.zeros(npart, dtype=my_float)
 
-    for j in range(npart):
+    for j in prange(npart):
         for i, ind_n in enumerate(neighbours[j]):
             # kernels are symmetric in x_i, x_j, but h can vary!!!!
             W_j_at_i[j, i] = psi(
@@ -314,7 +335,7 @@ def Aij_Ivanova_all(
         Vol[i] = 1 / omega[i]
 
     # now compute A_ij for all neighbours j of i
-    for i in range(npart):
+    for i in prange(npart):
 
         nbors = neighbours[i]
 
@@ -324,19 +345,20 @@ def Aij_Ivanova_all(
 
             grad_psi_j_xi = grad_psi_j_at_i[i, j]
             iind = iinds[i, j]
-            try:
-                grad_psi_i_xj = grad_psi_j_at_i[nj, iind]
-            except IndexError:
-                dx, dy = get_dx(x[i], x[nj], y[i], y[nj], L=L, periodic=periodic)
-                r = np.sqrt(dx ** 2 + dy ** 2)
-                if r / h[j] > 1.0:
-                    grad_psi_i_xj = 0.0
-                else:
-                    print("Didn't find index i=", i, "as neighbour of j=", nj)
-                    print("nbors i:", neighbours[i])
-                    print("nbors j:", neighbours[nj])
-                    print("r/H_i", r / h[i], "r/H[j]", r / h[nj])
-                    raise IndexError
+            grad_psi_i_xj = grad_psi_j_at_i[nj, iind]
+            #  try:
+            #      grad_psi_i_xj = grad_psi_j_at_i[nj, iind]
+            #  except IndexError:
+            #      dx, dy = get_dx(x[i], x[nj], y[i], y[nj], L=L, periodic=periodic)
+            #      r = np.sqrt(dx ** 2 + dy ** 2)
+            #      if r / h[j] > 1.0:
+            #          grad_psi_i_xj = 0.0
+            #      else:
+            #          print("Didn't find index i=", i, "as neighbour of j=", nj)
+            #          print("nbors i:", neighbours[i])
+            #          print("nbors j:", neighbours[nj])
+            #          print("r/H_i", r / h[i], "r/H[j]", r / h[nj])
+            #  raise IndexError
 
             V_j = Vol[nj]
 
@@ -345,11 +367,18 @@ def Aij_Ivanova_all(
     return A_ij, neighbours
 
 
-# ==================================================================================================
 def Aij_Ivanova(
-    pind, x, y, h, m, rho, kernel="cubic_spline", fact=1.0, L=1.0, periodic=True
+    pind: int,
+    x: np.ndarray,
+    y: np.ndarray,
+    h: np.ndarray,
+    m: np.ndarray,
+    rho: np.ndarray,
+    kernel="cubic_spline",
+    fact: float = 1.0,
+    L: List = (1.0, 1.0),
+    periodic: bool = True,
 ):
-    # ==================================================================================================
     """
     Compute A_ij as defined by Ivanova 2013, using the discretization by Taylor
     expansion as Hopkins does it. Use analytical expressions for the
@@ -452,9 +481,8 @@ def Aij_Ivanova(
     return A_ij
 
 
-# ====================================================
+@jit(nopython=True)
 def x_ij(pind, x, y, h, nbors=None, which=None):
-    # ====================================================
     """
     compute x_ij for all neighbours of particle with index pind
     if which=integer is given, instead compute only for specific particle
@@ -488,20 +516,19 @@ def x_ij(pind, x, y, h, nbors=None, which=None):
     return
 
 
-# ==========================================================================================
+#  @jit()
 def get_grad_psi_j_at_i_analytical(
-    x,
-    y,
-    h,
-    omega,
-    W_j_at_i,
+    x: np.ndarray,
+    y: np.ndarray,
+    h: np.ndarray,
+    omega: np.ndarray,
+    W_j_at_i: np.ndarray,
     neighbour_data,
     kernel="cubic_spline",
-    fact=1.0,
-    L=1.0,
-    periodic=True,
+    fact: float = 1.0,
+    L: List = (1.0, 1.0),
+    periodic: bool = True,
 ):
-    # ==========================================================================================
     """
     Compute \nabla \psi_k (x_l) for all particles k and l
     x, y, h:        arrays of positions and compact support radius of all particles
@@ -531,7 +558,7 @@ def get_grad_psi_j_at_i_analytical(
     # gradient sum for the same h_i
     sum_grad_W = np.zeros((npart, 2), dtype=my_float)
 
-    for j in range(npart):
+    for j in prange(npart):
         for i, ind_n in enumerate(neighbours[j]):
             dx, dy = get_dx(x[j], x[ind_n], y[j], y[ind_n], L=L, periodic=periodic)
             r = np.sqrt(dx ** 2 + dy ** 2)
@@ -544,7 +571,7 @@ def get_grad_psi_j_at_i_analytical(
             sum_grad_W[j] += grad_W_j_at_i[j, i]
 
     # finish computing the gradients: Need W(r, h), which is currently stored as psi
-    for j in range(npart):
+    for j in prange(npart):
         for i, ind_n in enumerate(neighbours[j]):
             grad_psi_j_at_i[j, i, 0] = (
                 grad_W_j_at_i[j, i, 0] / omega[j]
@@ -558,7 +585,6 @@ def get_grad_psi_j_at_i_analytical(
     return grad_psi_j_at_i
 
 
-# ==========================================================================================
 def get_grad_psi_j_at_i_analytical_old(
     x,
     y,
@@ -568,10 +594,9 @@ def get_grad_psi_j_at_i_analytical_old(
     neighbour_data,
     kernel="cubic_spline",
     fact=1.0,
-    L=1.0,
+    L: List = (1.0, 1.0),
     periodic=True,
 ):
-    # ==========================================================================================
     """
     Compute \nabla \psi_k (x_l) for all particles k and l
     x, y, h:        arrays of positions and compact support radius of all particles
@@ -648,11 +673,18 @@ def get_grad_psi_j_at_i_analytical_old(
     return grad_psi_j_at_i
 
 
-# ==========================================================================================
+@jit(nopython=True, fastmath=True)
 def compute_psi(
-    xi, yi, xj, yj, h, kernel="cubic_spline", fact=1.0, L=1.0, periodic=True
+    xi: float,
+    yi: float,
+    xj: np.ndarray,
+    yj: np.ndarray,
+    h: np.ndarray,
+    kernel="cubic_spline",
+    fact: float = 1.0,
+    L: List = (1.0, 1.0),
+    periodic: bool = True,
 ):
-    # ==========================================================================================
     """
     Compute all psi_j(x_i)
     xi, yi:     floats; position for which to compute psi's
@@ -700,9 +732,18 @@ def compute_psi(
     return psi_j
 
 
-# =================================================================================
-def psi(x, y, xi, yi, h, kernel="cubic_spline", fact=1.0, L=1.0, periodic=True):
-    # =================================================================================
+@jit()
+def psi(
+    x: float,
+    y: float,
+    xi: float,
+    yi: float,
+    h: float,
+    kernel: str = "cubic_spline",
+    fact: float = 1.0,
+    L: List = (1.0, 1.0),
+    periodic: bool = True,
+):
     """
     UNNORMALIZED Volume fraction at position x of some particle
     with coordinates xi, yi, smoothing length h(x)
@@ -725,9 +766,16 @@ def psi(x, y, xi, yi, h, kernel="cubic_spline", fact=1.0, L=1.0, periodic=True):
     return W(q, h, kernel)
 
 
-# ============================================================
-def get_matrix(xi, yi, xj, yj, psi_j, L=1, periodic=True):
-    # ============================================================
+@jit(nopython=True)
+def get_matrix(
+    xi: float,
+    yi: float,
+    xj: np.ndarray,
+    yj: np.ndarray,
+    psi_j: np.ndarray,
+    L: float = 1,
+    periodic: bool = True,
+):
     """
     Get B_i ^{alpha beta}
 
@@ -763,11 +811,20 @@ def get_matrix(xi, yi, xj, yj, psi_j, L=1, periodic=True):
     return
 
 
-# =============================================================================================
+@jit(nopython=True)
 def h_of_x(
-    xx, yy, x, y, h, m, rho, kernel="cubic_spline", fact=1.0, L=1.0, periodic=True
+    xx: float,
+    yy: float,
+    x: np.ndarray,
+    y: np.ndarray,
+    h: np.ndarray,
+    m: np.ndarray,
+    rho: np.ndarray,
+    kernel="cubic_spline",
+    fact: float = 1.0,
+    L: List = (1.0, 1.0),
+    periodic: bool = True,
 ):
-    # =============================================================================================
     """
     Compute h(x) at position (xx, yy), where there is
     not necessariliy a particle

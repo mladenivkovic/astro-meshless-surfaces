@@ -21,5 +21,6 @@ setup(
             'numpy',
             'matplotlib',
             'h5py'
-        ]
+        ],
+        extras_requires = ['numba']
      )
