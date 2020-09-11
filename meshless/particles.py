@@ -7,7 +7,7 @@
 #  copyright: GPLv3
 #             Copyright (C) 2019 EPFL (Ecole Polytechnique Federale de Lausanne)
 #             LASTRO - Laboratory of Astrophysics of EPFL
-#  author:    Mladen Ivkovic <mladen.ivkovic@epfl.ch>
+#  author:    Mladen Ivkovic <mladen.ivkovic@hotmail.com>
 #
 # This file is part of astro-meshless-surfaces.
 ###########################################################################################
