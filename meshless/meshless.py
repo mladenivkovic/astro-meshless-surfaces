@@ -19,7 +19,7 @@ visualisiation with 2d datasets.
 
 from .kernels import *
 from .particles import *
-from .optional_packages import jit, List
+from .optional_packages import jit, List, prange
 
 from typing import Union
 import numpy as np
@@ -34,7 +34,7 @@ def Aij_Hopkins(
         rho: np.ndarray,
         tree: Union[None, cKDTree] = None,
         kernel="cubic_spline",
-        L: List = [1.0, 1.0],
+        L: List = (1.0, 1.0),
         periodic=True,
 ):
     """
@@ -167,7 +167,7 @@ def Aij_Hopkins_v2(
         rho: np.ndarray,
         tree: Union[None, cKDTree],
         kernel: str = "cubic_spline",
-        L: List = [1.0, 1.0],
+        L: List = (1.0, 1.0),
         periodic=True,
 ):
     """
@@ -277,14 +277,14 @@ def Aij_Hopkins_v2(
 
     return A_ij
 
-
+@jit(nopython=False, parallel=True, forceobj=True)
 def Aij_Ivanova_all(
         x: np.ndarray,
         y: np.ndarray,
         H: np.ndarray,
         tree: Union[None, cKDTree] = None,
         kernel: str = "cubic_spline",
-        L: List = [1.0, 1.0],
+        L: List = (1.0, 1.0),
         periodic: bool = True,
 ):
     """
@@ -365,7 +365,7 @@ def Aij_Ivanova_all(
         Vol[i] = 1.0 / omega[i]
 
     # now compute A_ij for all neighbours j of i
-    for i in range(npart):
+    for i in prange(npart):
 
         nbors = neighbours[i]
 
@@ -388,7 +388,7 @@ def Aij_Ivanova(
         H: np.ndarray,
         tree: Union[None, cKDTree] = None,
         kernel="cubic_spline",
-        L: List = [1.0, 1.0],
+        L: List = (1.0, 1.0),
         periodic: bool = True,
 ):
     """
@@ -551,7 +551,7 @@ def x_ij(
         )
 
 
-@jit(nopython=True)
+@jit(nopython=True, parallel=True)
 def get_W_j_at_i(
         x: np.ndarray,
         y: np.ndarray,
@@ -559,7 +559,7 @@ def get_W_j_at_i(
         neighbours: List,
         maxneigh: int,
         kernel: str = "cubic_spline",
-        L: List = [1.0, 1.0],
+        L: List = (1.0, 1.0),
         periodic: bool = True,
 ):
     """
@@ -611,7 +611,7 @@ def get_W_j_at_i(
     W_j_at_i = np.zeros(npart * maxneigh).reshape(npart, maxneigh)
     omega = np.zeros(npart)
 
-    for j in range(npart):
+    for j in prange(npart):
         nn = len(neighbours[j])
         for i in range(nn):
             ind_n = neighbours[j][i]
@@ -633,7 +633,7 @@ def get_W_j_at_i(
     return W_j_at_i, omega
 
 
-@jit(nopython=True)
+@jit(nopython=True, parallel=True)
 def get_grad_psi_j_at_i_analytical(
         x: np.ndarray,
         y: np.ndarray,
@@ -643,7 +643,7 @@ def get_grad_psi_j_at_i_analytical(
         neighbours: List,
         maxneigh: int,
         kernel="cubic_spline",
-        L: List = [1.0, 1.0],
+        L: List = (1.0, 1.0),
         periodic: bool = True,
 ):
     """
@@ -699,7 +699,7 @@ def get_grad_psi_j_at_i_analytical(
     # gradient sum for the same h_i
     sum_grad_W = np.zeros(npart * 2).reshape((npart, 2))
 
-    for j in range(npart):
+    for j in prange(npart):
         for i, ind_n in enumerate(neighbours[j]):
             dx, dy = get_dx(x[j], x[ind_n], y[j], y[ind_n], L=L, periodic=periodic)
             r = np.sqrt(dx ** 2 + dy ** 2)
@@ -712,7 +712,7 @@ def get_grad_psi_j_at_i_analytical(
             sum_grad_W[j] += grad_W_j_at_i[j, i]
 
     # finish computing the gradients: Need W(r, h), which is currently stored as psi
-    for j in range(npart):
+    for j in prange(npart):
         for i, ind_n in enumerate(neighbours[j]):
             grad_psi_j_at_i[j, i, 0] = (
                     grad_W_j_at_i[j, i, 0] / omega[j]
@@ -726,7 +726,7 @@ def get_grad_psi_j_at_i_analytical(
     return grad_psi_j_at_i
 
 
-@jit(nopython=True, fastmath=True)
+@jit(nopython=True, parallel=True)
 def compute_psi_j(
         xi: float,
         yi: float,
@@ -734,7 +734,7 @@ def compute_psi_j(
         yj: np.ndarray,
         Hi: float,
         kernel: str = "cubic_spline",
-        L: List = [1.0, 1.0],
+        L: List = (1.0, 1.0),
         periodic: bool = True,
 ):
     """
@@ -779,13 +779,13 @@ def compute_psi_j(
 
     psi_j = np.zeros(xj.shape[0])
 
-    for j in range(xj.shape[0]):
+    for j in prange(xj.shape[0]):
         psi_j[j] = psi(xi, yi, xj[j], yj[j], Hi, kernel=kernel, L=L, periodic=periodic)
 
     return psi_j
 
 
-@jit(nopython=True, fastmath=True)
+@jit(nopython=True, parallel=True)
 def compute_psi_i(
         xi: float,
         yi: float,
@@ -793,7 +793,7 @@ def compute_psi_i(
         yj: np.ndarray,
         Hj: np.ndarray,
         kernel: str = "cubic_spline",
-        L: List = [1.0, 1.0],
+        L: List = (1.0, 1.0),
         periodic: bool = True,
 ):
     """
@@ -838,7 +838,7 @@ def compute_psi_i(
 
     psi_i = np.zeros(xj.shape[0])
 
-    for j in range(xj.shape[0]):
+    for j in prange(xj.shape[0]):
         psi_i[j] = psi(
             xj[j], yj[j], xi, yi, Hj[j], kernel=kernel, L=L, periodic=periodic
         )
@@ -854,7 +854,7 @@ def psi(
         yj: float,
         Hi: float,
         kernel: str = "cubic_spline",
-        L: List = [1.0, 1.0],
+        L: List = (1.0, 1.0),
         periodic: bool = True,
 ):
     """
@@ -905,13 +905,14 @@ def psi(
     return W(q, Hi, kernel)
 
 
+@jit(nopython=True, parallel=True)
 def get_matrix(
         xi: float,
         yi: float,
         xj: np.ndarray,
         yj: np.ndarray,
         psi_j: np.ndarray,
-        L: List = [1.0, 1.0],
+        L: List = (1.0, 1.0),
         periodic: bool = True,
 ):
     """
@@ -972,7 +973,7 @@ def h_of_x(
         y: np.ndarray,
         h: np.ndarray,
         kernel="cubic_spline",
-        L: List = [1.0, 1.0],
+        L: List = (1.0, 1.0),
         periodic: bool = True,
 ):
     """

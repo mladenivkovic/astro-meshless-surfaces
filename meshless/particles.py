@@ -13,7 +13,7 @@
 ###########################################################################################
 
 import numpy as np
-from .optional_packages import jit, List
+from .optional_packages import jit, List, prange
 from typing import Union
 from scipy.spatial import cKDTree
 
@@ -349,6 +349,7 @@ def get_dx(
     return List((dx, dy))
 
 
+@jit(nopython=False, parallel=True, forceobj=True)
 def get_neighbours_for_all(
         x: np.ndarray,
         y: np.ndarray,
@@ -405,8 +406,8 @@ def get_neighbours_for_all(
 
     neighbours = List([List([1]) for _ in range(nparts)])
 
-    for p in range(nparts):
-        ns = tree.query_ball_point([x[p], y[p]], H[p], n_jobs=-1, )
+    for p in prange(nparts):
+        ns = tree.query_ball_point([x[p], y[p]], H[p], n_jobs=-1)
         ns.sort()
         ns.remove(p)  # remove yourself
 

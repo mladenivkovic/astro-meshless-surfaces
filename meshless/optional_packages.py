@@ -21,7 +21,7 @@ except (ImportError, ModuleNotFoundError):
         return range(*args, **kwargs)
 
 
-    List = list
+    List = tuple
 
 #  def jit(*args, **kwargs):
 #      def x(func):
