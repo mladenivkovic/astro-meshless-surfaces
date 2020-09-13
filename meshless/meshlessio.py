@@ -16,7 +16,10 @@
 All io related functions.
 """
 
+import os
+import numpy as np
 from typing import Union
+import h5py
 
 
 def read_file(srcfile: str, ptype: str = "PartType0", sort: bool = False):
@@ -60,9 +63,7 @@ def read_file(srcfile: str, ptype: str = "PartType0", sort: bool = False):
         number of particles
     """
 
-    import h5py
-
-    f = h5py.File(srcfile)
+    f = h5py.File(srcfile, "r")
 
     x = f[ptype]["Coordinates"][:, 0]
     y = f[ptype]["Coordinates"][:, 1]
@@ -82,9 +83,7 @@ def read_file(srcfile: str, ptype: str = "PartType0", sort: bool = False):
     f.close()
 
     if sort:
-        from numpy import argsort
-
-        inds = argsort(ids)
+        inds = np.argsort(ids)
         x = x[inds]
         y = y[inds]
         h = h[inds]
@@ -125,9 +124,6 @@ def get_sample_size(prefix: Union[str, None] = None):
     fileskip: int
         integer difference between two XXX or YYY
     """
-
-    import os
-    import numpy as np
 
     if prefix is not None:
         filelist = os.listdir(prefix)
@@ -189,7 +185,6 @@ def snapstr(number):
 
     if isinstance(number, float):
         raise ValueError(errormsg)
-    import numpy as np
 
     try:
         n = int(number)
@@ -215,9 +210,6 @@ def read_boxsize(fnamestr="_0000.hdf5"):
     boxsize: list
         [xdim, ydim, zdim] list, where xdim, ydim, zdim are floats
     """
-
-    import os
-    import h5py
 
     filelist = os.listdir()
     for f in filelist:

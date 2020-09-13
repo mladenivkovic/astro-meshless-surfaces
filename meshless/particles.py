@@ -14,38 +14,62 @@
 
 import numpy as np
 from .optional_packages import jit, List
+from typing import Union
+from scipy.spatial import cKDTree
 
 
-def find_index(x, y, pcoord, tolerance=1e-3):
+@jit(nopython=True)
+def find_index(
+        x: np.ndarray, y: np.ndarray, pcoord: np.ndarray
+):
     """
     Find the index in the read-in arrays where
     the particle with coordinates of your choice is
 
-    x, y:       arrays of x, y positions of all particles
-    pcoors:     array/list of x,y position of particle to look for
-    tolerance:  how much of a tolerance to use to identify particle
-                useful when you have random perturbations of a
-                uniform grid with unknown exact positions
+
+    Parameters
+    ----------
+    x: numpy.ndarray
+        particle x positions
+
+    y: numpy.ndarray
+        particle y positions
+
+    pcoord: numpy.ndarray
+        coordinates of the particle that you want to look for
+
+
+    Returns
+    -------
+
+    pind: integer
+        Particle index in `x`, `y` arrays
     """
 
-    for i in range(x.shape[0]):
-        if abs(x[i] - pcoord[0]) < tolerance and abs(y[i] - pcoord[1]) < tolerance:
-            pind = i
-            break
-
+    diff = (x - pcoord[0]) ** 2 + (y - pcoord[1]) ** 2
+    pind = np.argmin(diff)
     return pind
 
 
-def find_index_by_id(ids, id_to_look_for):
+def find_index_by_id(ids: np.ndarray, id_to_look_for: int):
     """
     Find the index in the read-in arrays where
     the particle with id_to_look_for is
 
-        ids:    numpy array of particle IDs
-        id_to_look_for : which ID to find
+    Parameters
+    ----------
+   
+    ids:    numpy.ndarray
+        particle IDs
+    
+    id_to_look_for : int
+        which ID to find
 
-    returns:
-        pind:  index of particle with id_to_look_for
+
+    Returns
+    -------
+    pind:  integer
+        index of particle with id_to_look_for
 
     """
 
@@ -54,79 +78,129 @@ def find_index_by_id(ids, id_to_look_for):
     return pind
 
 
-def find_neighbours(ind, x, y, h, L: List = (1.0, 1.0), periodic=True):
+def find_neighbours(
+        ind: int,
+        x: np.ndarray,
+        y: np.ndarray,
+        H: np.ndarray,
+        tree: Union[None, cKDTree] = None,
+        L: List = (1.0, 1.0),
+        periodic: bool = True,
+):
     """
     Find indices of all neighbours of a particle with index ind
-    within h (where kernel != 0)
-    x, y, h:    arrays of positions/h of all particles
-    L:          boxsize
-    periodic:   Whether you assume periodic boundary conditions
+    within kernel suppor radius H (where kernel != 0)
 
-    returns list of neighbour indices in x,y,h array
+
+    Parameters
+    ----------
+
+    ind: integer
+        index of particle whose neighbours you want
+
+    x: numpy.ndarray
+        particle x positions
+
+    y: numpy.ndarray
+        particle y positions
+
+    H: numpy.ndarray
+        kernel support radii
+
+    tree: None or scipy.spatial.cKDTree
+        tree used to look for neighbours. If `None`, will be generated.
+
+    L: Tuple
+        boxsize
+
+    periodic: bool
+        whether to assume periodic boundaries
+
+
+    Returns
+    -------
+
+    tree: scipy.spatial.cKDTree
+        tree used to look for neighbours.
+
+    neigh: List
+        list of neighbour indices.
+
     """
 
-    x0 = x[ind]
-    y0 = y[ind]
-    fhsq = h[ind] * h[ind]
-    neigh = [None for i in x]
+    if tree is None:
+        tree = get_tree(x, y, L=L, periodic=periodic)
 
-    j = 0
-    for i in range(x.shape[0]):
-        if i == ind:
-            continue
+    ns = tree.query_ball_point([x[ind], y[ind]], H[ind], n_jobs=-1, )
 
-        dx, dy = get_dx(x0, x[i], y0, y[i], L=L, periodic=periodic)
+    ns.remove(ind)  # remove yourself
+    ns.sort()
 
-        dist = dx ** 2 + dy ** 2
-
-        if dist < fhsq:
-            neigh[j] = i
-            j += 1
-
-    return neigh[:j]
+    return tree, List(ns)
 
 
-def find_neighbours_arbitrary_x(x0, y0, x, y, h, L: List = (1.0, 1.0), periodic=True):
+def find_neighbours_arbitrary_x(
+        x0: float,
+        y0: float,
+        x: np.ndarray,
+        y: np.ndarray,
+        H: float,
+        tree: Union[cKDTree, None] = None,
+        L: List = (1.0, 1.0),
+        periodic=True,
+):
     """
     Find indices of all neighbours around position x0, y0
-    within h (where kernel != 0)
-    x, y, h:    arrays of positions/h of all particles
-    L:          boxsize
-    periodic:   Whether you assume periodic boundary conditions
+    within H (where kernel != 0)
 
-    returns list of neighbour indices
+    Parameters
+    ----------
+
+    x0: float
+        x position for which to look
+
+    y0: float
+        y position for which to look
+
+    x: numpy.ndarray
+        particle x positions
+
+    y: numpy.ndarray
+        particle y positions
+
+    H: float
+       kernel support radius around (x0, y0)
+
+    tree: scipy.spatial.cKDTree object or None
+        tree to query. If none, one will be generated.
+
+    L: Tuple
+        boxsize
+
+    periodic: bool
+        whether to assume periodic boundaries
+
+
+    Returns
+    -------
+
+    tree: scipy.spatial.cKDTree
+        tree used to look up neighbours.
+
+    neighbours: list
+        list of lists of neighbour indices
+
     """
 
-    # None for Gaussian
-    neigh = [None for i in x]
-    j = 0
+    if tree is None:
+        tree = get_tree(x, y, L=L, periodic=periodic)
 
-    if isinstance(h, np.ndarray):
+    coord = np.array([x0, y0])
 
-        for i in range(x.shape[0]):
+    ns = tree.query_ball_point(coord, H, n_jobs=-1)
+    ns.sort()
 
-            dx, dy = get_dx(x0, x[i], y0, y[i], L=L, periodic=periodic)
-
-            dist = dx ** 2 + dy ** 2
-
-            fhsq = h[i] ** 2
-            if dist < fhsq:
-                neigh[j] = i
-                j += 1
-
-    else:
-        fhsq = h ** 2
-        for i in range(x.shape[0]):
-
-            dx, dy = get_dx(x0, x[i], y0, y[i], L=L, periodic=periodic)
-
-            dist = dx ** 2 + dy ** 2
-
-            if dist < fhsq:
-                neigh[j] = i
-                j += 1
-
-    return neigh[:j]
+    return tree, List(ns)
 
 
 def V(ind: int, m: np.ndarray, rho: np.ndarray):
@@ -215,14 +289,14 @@ def find_added_particle(ids: np.ndarray):
     return pind
 
 
-@jit()
+@jit(nopython=True)
 def get_dx(
-    x1: float,
-    x2: float,
-    y1: float,
-    y2: float,
-    L: List = (1.0, 1.0),
-    periodic: bool = True,
+        x1: float,
+        x2: float,
+        y1: float,
+        y2: float,
+        L: List = (1.0, 1.0),
+        periodic: bool = True,
 ):
     """
     Compute difference of vectors [x1 - x2, y1 - y2] while
@@ -272,384 +346,108 @@ def get_dx(
         elif dy < -Lyhalf:
             dy += L[1]
 
-    return List(dx, dy)
+    return List((dx, dy))
 
 
-def get_neighbour_data_for_all(x, y, h, L: List = (1.0, 1.0), periodic=True):
-    """
-    Gets all the neighbour data for all particles ready.
-    Assumes domain is a rectangle with boxsize L[0], L[1].
-    x, y, h:    arrays of positions/h of all particles
-    L:          boxsize. List/Array or scalar.
-    periodic:   Whether you assume periodic boundary conditions
-
-    returns neighbour_data object:
-        self.neighbours :   List of lists of every neighbour of every particle
-        self.maxneigh :     Highest number of neighbours
-        self.nneigh:        integer array of number of neighbours for every particle
-        self.iinds:         iinds[i, j] = which index does particle i have in the neighbour
-                            list of particle j, where j is the j-th neighbour of i
-                            Due to different smoothing lengths, particle j can be the
-                            neighbour of i, but i not the neighbour of j.
-                            In that case, the particles will be assigned indices j > nneigh[i]
-
-    """
-
-    import copy
-
-    # if it isn't in a list already, create one
-    # do this before function/class definition
-    if not hasattr(L, "__len__"):
-        L = [L, L]
-
-    class neighbour_data:
-        def __init__(self, neighbours=None, maxneigh=None, nneigh=None, iinds=None):
-            self.neighbours = neighbours
-            self.maxneigh = maxneigh
-            self.nneigh = nneigh
-            self.iinds = iinds
-
-        # -----------------------------------------------
-
-    class cell:
-        """
-        A cell object to store particles in.
-        Stores particle indexes, positions, compact support radii
-        """
-
-        def __init__(self):
-            self.npart = 0
-            self.size = 100
-            self.parts = np.zeros(self.size, dtype=np.int)
-            self.x = np.zeros(self.size, dtype=np.float)
-            self.y = np.zeros(self.size, dtype=np.float)
-            self.h = np.zeros(self.size, dtype=np.float)
-            self.xmin = 1e300
-            self.xmax = -1e300
-            self.ymin = 1e300
-            self.ymax = -1e300
-            self.hmax = -1e300
-            return
-
-        def add_particle(self, ind, xp, yp, hp):
-            """
-            Add a particle, store the index, positions and h
-            """
-            if self.npart == self.size:
-                self.parts = np.append(self.parts, np.zeros(self.size, dtype=np.int))
-                self.x = np.append(self.x, np.zeros(self.size, dtype=np.float))
-                self.y = np.append(self.y, np.zeros(self.size, dtype=np.float))
-                self.h = np.append(self.h, np.zeros(self.size, dtype=np.float))
-                self.size *= 2
-
-            self.parts[self.npart] = ind
-            self.x[self.npart] = xp
-            self.y[self.npart] = yp
-            self.h[self.npart] = hp
-            self.npart += 1
-
-            if self.xmax < xp:
-                self.xmax = xp
-            if self.xmin > xp:
-                self.xmin = xp
-            if self.ymax < yp:
-                self.ymax = yp
-            if self.ymin > yp:
-                self.ymin = yp
-            if self.hmax < hp:
-                self.hmax = hp
-
-            return
-
-        def is_within_h(self, xp, yp, hp):
-            """
-            Check whether any particle of this cell is within
-            compact support of particle with x, y, h = xp, yp, hp
-            """
-            dx1, dy1 = get_dx(xp, self.xmax, yp, self.ymax, L=L, periodic=periodic)
-            dx2, dy2 = get_dx(xp, self.xmin, yp, self.ymin, L=L, periodic=periodic)
-            dxsq = min(dx1 * dx1, dx2 * dx2)
-            dysq = min(dy1 * dy1, dy2 * dy2)
-            if dxsq / hp ** 2 <= 1 or dysq / hp ** 2 <= 1:
-                return True
-            else:
-                return False
-
-        # -----------------------------------------------
-
-    def find_neighbours_in_cell(i, j, p, xx, yy, hh, is_self):
-        """
-        Find neighbours of a particle in the cell with indices i,j
-        of the grid
-        p:      global particle index to work with
-        xx, yy: position of particle x
-        hh:     compact support radius for p
-        is_self: whether this is the cell where p is in
-        """
-        n = 0
-        neigh = [0 for i in range(1000)]
-        ncell = grid[i][j]  # neighbour cell we're checking for
-
-        if not is_self:
-            if not ncell.is_within_h(xx, yy, hh):
-                return []
-
-        N = ncell.npart
-
-        fhsq = hh ** 2
-
-        for c, cp in enumerate(ncell.parts[:N]):
-            if cp == p:
-                # skip yourself
-                continue
-
-            dx, dy = get_dx(xx, ncell.x[c], yy, ncell.y[c], L=L, periodic=periodic)
-
-            dist = dx ** 2 + dy ** 2
-
-            if dist <= fhsq:
-                try:
-                    neigh[n] = cp
-                except IndexError:
-                    nneigh += [0 for i in range(1000)]
-                    nneigh[n] = cp
-                n += 1
-
-        return neigh[:n]
-        # -----------------------------------------------
-
-    npart = x.shape[0]
-
-    # first find cell size
-    ncells_x = int(L[0] / h.max()) + 1
-    ncells_y = int(L[1] / h.max()) + 1
-    cell_size_x = L[0] / ncells_x
-    cell_size_y = L[1] / ncells_y
-
-    # create grid
-    grid = [[cell() for j in range(ncells_y)] for i in range(ncells_x)]
-
-    # sort out particles
-    for p in range(npart):
-        i = int(x[p] / cell_size_x)
-        j = int(y[p] / cell_size_y)
-        grid[i][j].add_particle(p, x[p], y[p], h[p])
-
-    neighbours = [[] for i in x]
-    nneigh = np.zeros(npart, dtype=np.int)
-
-    # main loop: find and store all neighbours;
-    # go cell by cell
-    for row in range(ncells_y):
-        for col in range(ncells_x):
-
-            cell = grid[col][row]
-            N = cell.npart
-            parts = cell.parts
-            if N == 0:
-                continue
-
-            hmax = cell.h[:N].max()
-
-            # find over how many cells to loop in every direction
-            maxdistx = int(cell_size_x / hmax + 0.5) + 1
-            maxdisty = int(cell_size_y / hmax + 0.5) + 1
-
-            xstart = -maxdistx
-            xstop = maxdistx + 1
-            ystart = -maxdisty
-            ystop = maxdisty + 1
-
-            # exception handling: if ncells < 4, just loop over
-            # all of them so that you don't add neighbours multiple
-            # times
-            if ncells_x < 4:
-                xstart = 0
-                xstop = ncells_x
-            if ncells_y < 4:
-                ystart = 0
-                ystop = ncells_y
-
-            checked_cells = [
-                (None, None) for i in range((2 * maxdistx + 1) * (2 * maxdisty + 1))
-            ]
-            it = 0
-
-            # loop over all neighbours
-            # need to loop over entire square. You need to consider
-            # the maximal distance from the edges/corners, not from
-            # the center of the cell!
-            for i in range(xstart, xstop):
-                for j in range(ystart, ystop):
-
-                    if ncells_x < 4:
-                        iind = i
-                    else:
-                        iind = col + i
-
-                    if ncells_y < 4:
-                        jind = j
-                    else:
-                        jind = row + j
-
-                    if periodic:
-                        while iind < 0:
-                            iind += ncells_x
-                        while iind >= ncells_x:
-                            iind -= ncells_x
-                        while jind < 0:
-                            jind += ncells_y
-                        while jind >= ncells_y:
-                            jind -= ncells_y
-                    else:
-                        if iind < 0 or iind >= ncells_x:
-                            continue
-                        if jind < 0 or jind >= ncells_y:
-                            continue
-
-                    it += 1
-                    if (iind, jind) in checked_cells[: it - 1]:
-                        continue
-                    else:
-                        checked_cells[it - 1] = (iind, jind)
-
-                    # loop over all particles in THIS cell
-                    for pc, pg in enumerate(cell.parts[:N]):
-
-                        xp = cell.x[pc]
-                        yp = cell.y[pc]
-                        hp = cell.h[pc]
-
-                        neighbours[pg] += find_neighbours_in_cell(
-                            iind, jind, pg, xp, yp, hp, iind == col and jind == row
-                        )
-
-    # sort neighbours by index
-    for p in range(npart):
-        neighbours[p].sort()
-        nneigh[p] = len(neighbours[p])
-
-    # max number of neighbours; needed for array allocation
-    maxneigh = nneigh.max()
-
-    # store the index of particle i when required as the neighbour of particle j in arrays[npart, maxneigh]
-    # i.e. find index 0 <= i < maxneigh for ever j
-    iinds = np.zeros((npart, 2 * maxneigh), dtype=np.int)
-    current_count = copy.copy(nneigh)
-
-    for i in range(npart):
-        for jc, j in enumerate(neighbours[i]):
-
-            try:
-                iinds[i, jc] = (neighbours[j]).index(i)
-            except ValueError:
-                # it is possible that j is a neighbour for i, but i is not a neighbour
-                # for j depending on their respective smoothing lengths
-                dx, dy = get_dx(x[i], x[j], y[i], y[j], L=L, periodic=periodic)
-                r = np.sqrt(dx ** 2 + dy ** 2)
-                if r / h[j] < 1:
-                    print(
-                        "something went wrong when computing iinds in get_neighbour_data_for_all."
-                    )
-                    print("i=", i, "j=", j, "r=", r, "H=", h[j], "r/H=", r / h[j])
-                    print("neighbours i:", neighbours[i])
-                    print("neighbours j:", neighbours[j])
-                    print("couldn't find i as neighbour of j")
-                    print("exiting")
-                    quit()
-                else:
-                    # append after nneigh[j]
-                    iinds[i, jc] = current_count[j]
-                    current_count[j] += 1
-
-    nd = neighbour_data(
-        neighbours=neighbours, maxneigh=maxneigh, nneigh=nneigh, iinds=iinds
-    )
-
-    return nd
-
-
-@jit(nopython=True)
-def get_neighbour_data_for_all_naive(
-    x: np.ndarray,
-    y: np.ndarray,
-    h: np.ndarray,
-    L: List = (1.0, 1.0),
-    periodic: bool = True,
+def get_neighbours_for_all(
+        x: np.ndarray,
+        y: np.ndarray,
+        H: np.ndarray,
+        tree: Union[cKDTree, None] = None,
+        L: List = (1.0, 1.0),
+        periodic: bool = True,
 ):
     """
-    Gets all the neighbour data for all particles ready.
-    Naive way: Loop over all particles for each particle
-    x, y, h:    arrays of positions/h of all particles
-    L:          boxsize
-    periodic:   Whether you assume periodic boundary conditions
+    Find neighbours for all particles.
 
-    returns neighbour_data object:
-        self.neighbours :   List of lists of every neighbour of every particle
-        self.maxneigh :     Highest number of neighbours
-        self.nneigh:        integer array of number of neighbours for every particle
-        self.iinds:         iinds[i, j] = which index does particle i have in the neighbour
-                            list of particle j, where j is the j-th neighbour of i
-                            Due to different smoothing lengths, particle j can be the
-                            neighbour of i, but i not the neighbour of j.
-                            In that case, the particles will be assigned indices j > nneigh[i]
+
+    Parameters
+    ----------
+
+    x: numpy.ndarray
+        particle x positions
+
+    y: numpy.ndarray
+        particle y positions
+
+    H: numpy.ndarray
+        kernel support radii
+
+    tree: scipy.spatial.cKDTree object or None
+        tree to query. If none, one will be generated.
+
+    L: Tuple
+        boxsize
+
+    periodic: bool
+        whether to assume periodic boundaries
+
+
+    Returns
+    -------
+
+    tree: scipy.spatial.cKDTree
+        tree used to look up neighbours.
+
+    neighbours: list
+        list of lists of neighbour indices
+
+    maxneigh: int
+        highest number of neighbours any particle has
 
     """
 
-    import copy
+    if tree is None:
+        tree = get_tree(x, y, L=L, periodic=periodic)
 
-    npart = x.shape[0]
+    nparts = x.shape[0]
+    maxneigh = 0
 
-    # find and store all neighbours;
-    neighbours = [[] for i in x]
-    for i in range(npart):
-        neighbours[i] = find_neighbours(i, x, y, h, L=L, periodic=periodic)
+    neighbours = List([List([1]) for _ in range(nparts)])
 
-    # get neighbour counts array
-    nneigh = np.zeros((npart), dtype=np.int)
-    for i in range(npart):
-        nneigh[i] = len(neighbours[i])
+    for p in range(nparts):
+        ns = tree.query_ball_point([x[p], y[p]], H[p], n_jobs=-1, )
+        ns.sort()
+        ns.remove(p)  # remove yourself
 
-    # max number of neighbours; needed for array allocation
-    maxneigh = nneigh.max()
+        neighbours[p] = List(ns)
+        if len(ns) > maxneigh:
+            maxneigh = len(ns)
 
-    # store the index of particle i when required as the neighbour of particle j in arrays[npart, maxneigh]
-    # i.e. find index 0 <= i < maxneigh for ever j
-    iinds = np.zeros((npart, 2 * maxneigh), dtype=np.int)
-    current_count = copy.copy(nneigh)
+    return tree, neighbours, maxneigh
 
-    for i in range(npart):
-        for jc, j in enumerate(neighbours[i]):
 
-            try:
-                iinds[i, jc] = (neighbours[j]).index(i)
-            except ValueError:
-                # it is possible that j is a neighbour for i, but i is not a neighbour
-                # for j depending on their respective smoothing lengths
-                dx, dy = get_dx(x[i], x[j], y[i], y[j], L=L, periodic=periodic)
-                r = np.sqrt(dx ** 2 + dy ** 2)
-                if r / h[j] < 1:
-                    print("something went wrong when computing iinds.")
-                    print("i=", i, "j=", j, "r=", r, "H=", h[j], "r/H=", r / h[j])
-                    print("neighbours i:", neighbours[i])
-                    print("neighbours j:", neighbours[j])
-                    print("couldn't find i as neighbour of j")
-                    print("exiting")
-                    quit()
-                else:
-                    # append after nneigh[j]
-                    iinds[i, jc] = current_count[j]
-                    current_count[j] += 1
+def get_tree(x: np.ndarray, y: np.ndarray, L: List = (1.0, 1.0), periodic: bool = True):
+    """
+    Generate the KDTree to be queried for neighbour searches.
 
-    class neighbour_data:
-        def __init__(self, neighbours=None, maxneigh=None, nneigh=None, iinds=None):
-            self.neighbours = neighbours
-            self.maxneigh = maxneigh
-            self.nneigh = nneigh
-            self.iinds = iinds
+    Parameters
+    ----------
 
-    nd = neighbour_data(
-        neighbours=neighbours, maxneigh=maxneigh, nneigh=nneigh, iinds=iinds
-    )
+    x: numpy.ndarray
+        particle x positions
 
-    return nd
+    y: numpy.ndarray
+        particle y positions
+
+    L: Tuple
+        boxsize
+
+    periodic: bool
+        whether to assume periodic boundaries
+
+    Returns
+    -------
+
+    tree: scipy.spatial.cKDTree
+        tree that can be queried for neighbour searches.
+    """
+
+    if periodic:
+        boxsize = L
+    else:
+        boxsize = None
+
+    fullarr = np.stack((x, y), axis=1)
+    tree = cKDTree(fullarr, boxsize=boxsize)
+    return tree

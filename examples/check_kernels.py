@@ -76,14 +76,15 @@ print(
 
 for kernel in kernel_derivatives:
     estimate_x = (
-        ms.psi(xl + d, yl, xk, yk, hl, kernel=kernel, L=100)
-        - ms.psi(xl, yl, xk, yk, hl, kernel=kernel, L=100)
+        ms.psi(xl + d, yl, xk, yk, hl, kernel=kernel, L=(100.0, 100.0))
+        - ms.psi(xl, yl, xk, yk, hl, kernel=kernel, L=(100.0, 100.0))
     ) / d
     estimate_y = (
-        ms.psi(xl, yl + d, xk, yk, hl, kernel=kernel, L=100)
-        - ms.psi(xl, yl, xk, yk, hl, kernel=kernel, L=100)
+        ms.psi(xl, yl + d, xk, yk, hl, kernel=kernel, L=(100.0, 100.0))
+        - ms.psi(xl, yl, xk, yk, hl, kernel=kernel, L=(100.0, 100.0))
     ) / d
-    #  estimate_r = (ms.psi(xl+d, yl+d, xk, yk, hl, kernel=kernel, L=100) - ms.psi(xl, yl, xk, yk, hl, kernel=kernel, L=100)) / d
+    #  estimate_r = (ms.psi(xl+d, yl+d, xk, yk, hl, kernel=kernel, L=(100.0, 100.0)) -
+    #                 ms.psi(xl, yl, xk, yk, hl, kernel=kernel, L=(100.0, 100.0))) / d
 
     exx = ms.dWdr(r, hl, kernel=kernel) * dx / r
     exy = ms.dWdr(r, hl, kernel=kernel) * dy / r

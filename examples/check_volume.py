@@ -25,9 +25,7 @@ except ImportError:
 # temp during rewriting
 srcfile = "./snapshot_uniform.hdf5"  # swift output file
 ptype = "PartType0"  # for which particle type to look for
-pcoord = [0.5, 0.5]  # coordinates of particle to work for
-
-my_float = np.float
+pcoord = np.array([0.5, 0.5])  # coordinates of particle to work for
 
 
 def main():
@@ -45,13 +43,13 @@ def main():
         H = ms.get_H(h, kernel)
 
         # compute all psi_i(x_j) for all i, j
-        psi_i_at_j = np.zeros((npart, npart), dtype=my_float)
+        psi_i_at_j = np.zeros((npart, npart))
 
         for i in range(npart):
             for j in range(npart):
                 psi_i_at_j[i, j] = ms.psi(x[j], y[j], x[i], y[i], H[j], kernel)
 
-        omega = np.zeros(npart, dtype=my_float)
+        omega = np.zeros(npart)
 
         for j in range(npart):
 
@@ -93,10 +91,6 @@ def main():
                 "%",
             )
         )
-
-    print(
-        "[Note: Gaussian kernel doesn't satisfy compactness condition, it's allowed to be wrong]"
-    )
 
 
 if __name__ == "__main__":

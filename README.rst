@@ -15,13 +15,19 @@ Also includes simple reading-in functions for SWIFT (https://ascl.net/1805.020)
 hdf5 output.
 
 
+I haven't written any sort of documentation apart from docstrings. If you
+want to know something, feel free to contact me anytime. Otherwise, there
+are some usecase examples in ``/examples``
+
+
 
 Requirements
 ------------
 
 - numpy > 1.15
-- matplotlib > 3
-- h5py > 2
+- matplotlib > 3.0
+- h5py > 2.0
+- scipy > 1.1
 
 Optional:
 

@@ -28,7 +28,10 @@ except ImportError:
 # temp during rewriting
 srcfile = "./snapshot_perturbed.hdf5"  # swift output file
 ptype = "PartType0"  # for which particle type to look for
-pcoords = [[0.5, 0.5], [0.7, 0.7]]  # coordinates of particle to work for
+pcoords = [
+    np.array([0.5, 0.5]),
+    np.array([0.7, 0.7]),
+]  # coordinates of particle to work for
 
 
 fullcolorlist = [
@@ -76,12 +79,12 @@ def main():
         print("Working for particle at", pcoord)
 
         pind = ms.find_index(x, y, pcoord, tolerance=0.05)
-        nbors = ms.find_neighbours(pind, x, y, H)
+        tree, nbors = ms.find_neighbours(pind, x, y, H)
 
         print("Computing effective surfaces")
 
-        A_ij_Hopkins = ms.Aij_Hopkins(pind, x, y, H, m, rho)
-        A_ij_Ivanova = ms.Aij_Ivanova(pind, x, y, H, m, rho)
+        A_ij_Hopkins = ms.Aij_Hopkins(pind, x, y, H, m, rho, tree=tree)
+        A_ij_Ivanova = ms.Aij_Ivanova(pind, x, y, H, m, rho, tree=tree)
 
         x_ij = ms.x_ij(pind, x, y, H, nbors=nbors)
 

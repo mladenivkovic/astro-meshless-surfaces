@@ -30,7 +30,7 @@ except ImportError:
 # temp during rewriting
 srcfile = "./snapshot_uniform.hdf5"  # swift output file
 ptype = "PartType0"  # for which particle type to look for
-pcoord = [0.5, 0.5]  # coordinates of particle to work for
+pcoord = np.array([0.5, 0.5])  # coordinates of particle to work for
 pind = None  # index of particle you chose with pcoord
 npart = 0
 
@@ -74,11 +74,11 @@ def main():
     # find index in the read in arrays that we want to work with
     pind = ms.find_index(x, y, pcoord)
     # find that particle's neighbours
-    nbors = ms.find_neighbours(pind, x, y, H)
+    tree, nbors = ms.find_neighbours(pind, x, y, H)
 
     print("Computing effective surfaces")
 
-    A_ij = ms.Aij_Ivanova(pind, x, y, H, m, rho)
+    A_ij = ms.Aij_Ivanova(pind, x, y, H, m, rho, tree=tree)
     x_ij = ms.x_ij(pind, x, y, H, nbors=nbors)
 
     print("Plotting")

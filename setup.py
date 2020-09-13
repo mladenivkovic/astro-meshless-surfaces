@@ -3,7 +3,7 @@ from setuptools import setup
 
 setup(
         name='astro-meshless-surfaces',
-        version='0.1.14',
+        version='0.1.15',
         author='Mladen Ivkovic',
         author_email='mladen.ivkovic@hotmail.com',
         packages=['meshless'],
@@ -20,7 +20,8 @@ setup(
         install_requires=[
             'numpy',
             'matplotlib',
-            'h5py'
+            'h5py',
+            'scipy'
         ],
         extras_requires = ['numba']
      )

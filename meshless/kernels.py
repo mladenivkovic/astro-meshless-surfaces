@@ -14,7 +14,7 @@
 
 import numpy as np
 from .optional_packages import jit
-
+from typing import Union
 
 # Names of all available kernels
 kernels = [
@@ -58,7 +58,6 @@ kernel_pretty_names = [
 kernelfacts = [1, 1, 1, 1, 1, 1, None]
 
 kernel_H_over_h = [1.778002, 1.977173, 2.158131, 1.897367, 2.171239, 2.415230, 1000]
-
 
 kernel_H_over_h_dict = {}
 for i, kernel in enumerate(kernels_with_gaussian):
@@ -131,20 +130,12 @@ def W(q: float, h: float, kernel: str = "cubic_spline"):
 
     elif kernel == "quintic_spline":
         if q < 0.333333333333:
-            q4 = q ** 4
             res = 10 * (q ** 4 * (1 - q) - 0.2222222222 * q ** 2) + 0.2682926829268
         elif q < 0.666666666666:
             qsq = q ** 2
             q4 = qsq ** 2
-            res = (
-                5
-                * (
-                    q4 * (q - 3)
-                    + qsq * (3.333333333333333 * q - 1.5555555555555)
-                    + 0.18518518518518517 * q
-                )
-                + 0.20987654320987653
-            )
+            res = (5 * (q4 * (q - 3) + qsq * (
+                    3.333333333333333 * q - 1.5555555555555) + 0.18518518518518517 * q) + 0.20987654320987653)
         elif q < 1:
             qsq = q ** 2
             res = qsq * (qsq * (5 - q) + 10 * (1 - q)) - 5 * q + 1
@@ -174,13 +165,13 @@ def W(q: float, h: float, kernel: str = "cubic_spline"):
             q4 = qsq ** 2
 
             return sigma * (
-                11.666666666666666 * q4 * q4
-                - 64 * q4 * qsq * q
-                + 140 * qsq * q4
-                - 149.3333333333333 * q4 * q
-                + 70 * q4
-                - 9.33333333333333 * qsq
-                + 1
+                    11.666666666666666 * q4 * q4
+                    - 64 * q4 * qsq * q
+                    + 140 * qsq * q4
+                    - 149.3333333333333 * q4 * q
+                    + 70 * q4
+                    - 9.33333333333333 * qsq
+                    + 1
             )
         else:
             return 0
@@ -191,15 +182,15 @@ def W(q: float, h: float, kernel: str = "cubic_spline"):
             #  sigma = 78/(7*np.pi*h**2)
             sigma = 3.546881588905096 / h ** 2
             return sigma * (
-                32 * q ** 11
-                - 231 * q ** 10
-                + 704 * q ** 9
-                - 1155 * q ** 8
-                + 1056 * q ** 7
-                - 462 * q ** 6
-                + 66 * q ** 4
-                - 11 * q ** 2
-                + 1
+                    32 * q ** 11
+                    - 231 * q ** 10
+                    + 704 * q ** 9
+                    - 1155 * q ** 8
+                    + 1056 * q ** 7
+                    - 462 * q ** 6
+                    + 66 * q ** 4
+                    - 11 * q ** 2
+                    + 1
             )
         else:
             return 0
@@ -210,8 +201,6 @@ def W(q: float, h: float, kernel: str = "cubic_spline"):
 
     else:
         raise ValueError("Didn't find kernel")
-
-    return
 
 
 @jit(nopython=True)
@@ -250,7 +239,7 @@ def dWdr(q: float, h: float, kernel: str = "cubic_spline"):
     dWdr: float
         evaluated kernel derivative
 
-"""
+    """
     #  https://pysph.readthedocs.io/en/latest/reference/kernels.html#liu2010
 
     if kernel == "cubic_spline":
@@ -284,11 +273,11 @@ def dWdr(q: float, h: float, kernel: str = "cubic_spline"):
             res = 40 * q ** 3 - 50 * q ** 4 - 4.44444444444 * q
         elif q < 0.666666666666:
             res = (
-                25 * q ** 4
-                - 60 * q ** 3
-                + 50 * q ** 2
-                - 15.555555555555 * q
-                + 0.9259259259259259
+                    25 * q ** 4
+                    - 60 * q ** 3
+                    + 50 * q ** 2
+                    - 15.555555555555 * q
+                    + 0.9259259259259259
             )
         elif q < 1:
             res = 20 * q ** 3 - 5 * q ** 4 + 20 * q - 30 * q ** 2 - 5
@@ -315,12 +304,12 @@ def dWdr(q: float, h: float, kernel: str = "cubic_spline"):
             sigma = 2.864788975654116 / h ** 3
 
             return sigma * (
-                93.3333333333 * q ** 7
-                - 448 * q ** 6
-                + 840 * q ** 5
-                - 746.6666666666 * q ** 4
-                + 280 * q ** 3
-                - 18.66666666666666 * q
+                    93.3333333333 * q ** 7
+                    - 448 * q ** 6
+                    + 840 * q ** 5
+                    - 746.6666666666 * q ** 4
+                    + 280 * q ** 3
+                    - 18.66666666666666 * q
             )
         else:
             return 0
@@ -331,14 +320,14 @@ def dWdr(q: float, h: float, kernel: str = "cubic_spline"):
             #  sigma = 78/(7*np.pi*h**2)
             sigma = 3.546881588905096 / h ** 3
             return sigma * (
-                352 * q ** 10
-                - 2310 * q ** 9
-                + 6336 * q ** 8
-                - 9240 * q ** 7
-                + 7392 * q ** 6
-                - 2772 * q ** 5
-                + 264 * q ** 3
-                - 22 * q
+                    352 * q ** 10
+                    - 2310 * q ** 9
+                    + 6336 * q ** 8
+                    - 9240 * q ** 7
+                    + 7392 * q ** 6
+                    - 2772 * q ** 5
+                    + 264 * q ** 3
+                    - 22 * q
             )
         else:
             return 0

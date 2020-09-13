@@ -24,7 +24,10 @@ import meshless as ms
 # temp during rewriting
 srcfile = "./snapshot_perturbed.hdf5"  # swift output file
 ptype = "PartType0"  # for which particle type to look for
-pcoords = [[0.5, 0.5], [0.7, 0.7]]  # coordinates of particle to work for
+pcoords = [
+    np.array([0.5, 0.5]),
+    np.array([0.7, 0.7]),
+]  # coordinates of particle to work for
 
 print_by_particle = False  # whether to print differences for each particle separately
 
@@ -68,8 +71,11 @@ def main():
     nrows = len(pcoords)
     fig = plt.figure(figsize=(10, 5 * nrows + 0.5))
 
+    # get KDTree
+    tree = ms.get_tree(x, y)
+
     # compute full ivanova only once
-    Aij_Ivanova_v2_full, nbors_all = ms.Aij_Ivanova_all(x, y, H, m, rho)
+    Aij_Ivanova_v2_full, nbors_all = ms.Aij_Ivanova_all(x, y, H, m, rho, tree=tree)
 
     count = 0
     for row, pcoord in enumerate(pcoords):
@@ -81,9 +87,9 @@ def main():
 
         print("Computing effective surfaces")
 
-        Aij_Hopkins = ms.Aij_Hopkins(pind, x, y, H, m, rho)
-        Aij_Hopkins_v2 = ms.Aij_Hopkins_v2(pind, x, y, H, m, rho)
-        Aij_Ivanova = ms.Aij_Ivanova(pind, x, y, H, m, rho)
+        Aij_Hopkins = ms.Aij_Hopkins(pind, x, y, H, m, rho, tree=tree)
+        Aij_Hopkins_v2 = ms.Aij_Hopkins_v2(pind, x, y, H, m, rho, tree=tree)
+        Aij_Ivanova = ms.Aij_Ivanova(pind, x, y, H, m, rho, tree=tree)
         Aij_Ivanova_v2 = Aij_Ivanova_v2_full[pind][: len(nbors)]
 
         x_ij = ms.x_ij(pind, x, y, H, nbors=nbors)
