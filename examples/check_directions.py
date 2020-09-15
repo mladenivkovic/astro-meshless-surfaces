@@ -12,12 +12,7 @@
 
 import numpy as np
 import matplotlib.pyplot as plt
-
-try:
-    import meshless as ms
-except ImportError:
-    print("Didn't find 'meshless' module... be sure to add it to your pythonpath!")
-    quit(2)
+import astro_meshless_surfaces as ml
 
 
 # ---------------------------
@@ -62,10 +57,10 @@ ncolrs = len(fullcolorlist)
 
 def main():
 
-    x, y, h, rho, m, ids, npart = ms.read_file(srcfile, ptype)
+    x, y, h, rho, m, ids, npart = ml.read_file(srcfile, ptype)
 
     # convert H to h
-    H = ms.get_H(h)
+    H = ml.get_H(h)
 
     # prepare figure
     nrows = len(pcoords)
@@ -76,15 +71,15 @@ def main():
 
         print("Working for particle at", pcoord)
 
-        pind = ms.find_index(x, y, pcoord)
-        tree, nbors = ms.find_neighbours(pind, x, y, H)
+        pind = ml.find_index(x, y, pcoord)
+        tree, nbors = ml.find_neighbours(pind, x, y, H)
 
         print("Computing effective surfaces")
 
-        A_ij_Hopkins = ms.Aij_Hopkins(pind, x, y, H, m, rho, tree=tree)
-        A_ij_Ivanova = ms.Aij_Ivanova(pind, x, y, H, tree=tree)
+        A_ij_Hopkins = ml.Aij_Hopkins(pind, x, y, H, m, rho, tree=tree)
+        A_ij_Ivanova = ml.Aij_Ivanova(pind, x, y, H, tree=tree)
 
-        x_ij = ms.x_ij(pind, x, y, H, nbors=nbors)
+        x_ij = ml.x_ij(pind, x, y, H, nbors=nbors)
 
         print("Sum Hopkins:", np.sum(A_ij_Hopkins, axis=0))
         print("Sum Ivanova:", np.sum(A_ij_Ivanova, axis=0))

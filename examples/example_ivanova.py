@@ -14,12 +14,7 @@
 
 import numpy as np
 import matplotlib.pyplot as plt
-
-try:
-    import meshless as ms
-except ImportError:
-    print("Didn't find 'meshless' module... be sure to add it to your pythonpath!")
-    quit(2)
+import astro_meshless_surfaces as ml
 
 
 # ---------------------------
@@ -66,20 +61,20 @@ ncolrs = len(fullcolorlist)
 def main():
 
     # read data from snapshot
-    x, y, h, rho, m, ids, npart = ms.read_file(srcfile, ptype)
+    x, y, h, rho, m, ids, npart = ml.read_file(srcfile, ptype)
 
     # get kernel support radius instead of smoothing length
-    H = ms.get_H(h)
+    H = ml.get_H(h)
 
     # find index in the read in arrays that we want to work with
-    pind = ms.find_index(x, y, pcoord)
+    pind = ml.find_index(x, y, pcoord)
     # find that particle's neighbours
-    tree, nbors = ms.find_neighbours(pind, x, y, H)
+    tree, nbors = ml.find_neighbours(pind, x, y, H)
 
     print("Computing effective surfaces")
 
-    A_ij = ms.Aij_Ivanova(pind, x, y, H, tree=tree)
-    x_ij = ms.x_ij(pind, x, y, H, nbors=nbors)
+    A_ij = ml.Aij_Ivanova(pind, x, y, H, tree=tree)
+    x_ij = ml.x_ij(pind, x, y, H, nbors=nbors)
 
     print("Plotting")
 

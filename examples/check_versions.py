@@ -11,9 +11,7 @@
 
 import numpy as np
 import matplotlib.pyplot as plt
-
-
-import meshless as ms
+import astro_meshless_surfaces as ml
 
 
 # ---------------------------
@@ -62,37 +60,37 @@ arrwidth = 2
 
 def main():
 
-    x, y, h, rho, m, ids, npart = ms.read_file(srcfile, ptype)
+    x, y, h, rho, m, ids, npart = ml.read_file(srcfile, ptype)
 
     # convert H to h
-    H = ms.get_H(h)
+    H = ml.get_H(h)
 
     # prepare figure
     nrows = len(pcoords)
     fig = plt.figure(figsize=(10, 5 * nrows + 0.5))
 
     # get KDTree
-    tree = ms.get_tree(x, y)
+    tree = ml.get_tree(x, y)
 
     # compute full ivanova only once
-    Aij_Ivanova_v2_full, nbors_all = ms.Aij_Ivanova_all(x, y, H, tree=tree)
+    Aij_Ivanova_v2_full, nbors_all = ml.Aij_Ivanova_all(x, y, H, tree=tree)
 
     count = 0
     for row, pcoord in enumerate(pcoords):
 
         print("Working for particle at", pcoord)
 
-        pind = ms.find_index(x, y, pcoord)
-        tree, nbors = ms.find_neighbours(pind, x, y, H, tree=tree)
+        pind = ml.find_index(x, y, pcoord)
+        tree, nbors = ml.find_neighbours(pind, x, y, H, tree=tree)
 
         print("Computing effective surfaces")
 
-        Aij_Hopkins = ms.Aij_Hopkins(pind, x, y, H, m, rho, tree=tree)
-        Aij_Hopkins_v2 = ms.Aij_Hopkins_v2(pind, x, y, H, m, rho, tree=tree)
-        Aij_Ivanova = ms.Aij_Ivanova(pind, x, y, H, tree=tree)
+        Aij_Hopkins = ml.Aij_Hopkins(pind, x, y, H, m, rho, tree=tree)
+        Aij_Hopkins_v2 = ml.Aij_Hopkins_v2(pind, x, y, H, m, rho, tree=tree)
+        Aij_Ivanova = ml.Aij_Ivanova(pind, x, y, H, tree=tree)
         Aij_Ivanova_v2 = Aij_Ivanova_v2_full[pind][: nbors.shape[0]]
 
-        x_ij = ms.x_ij(pind, x, y, H, nbors=nbors)
+        x_ij = ml.x_ij(pind, x, y, H, nbors=nbors)
 
         # --------------------------------------------------------------------------------------------------------
         print("Comparing Hopkins:")

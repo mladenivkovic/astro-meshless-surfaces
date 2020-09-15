@@ -6,15 +6,9 @@ setup(
         version='0.1.15',
         author='Mladen Ivkovic',
         author_email='mladen.ivkovic@hotmail.com',
-        packages=['meshless'],
+        packages=['astro_meshless_surfaces'],
         license='GLPv3',
         scripts=[
-                    "examples/example_ivanova.py",
-                    "examples/example_hopkins.py",
-                    "examples/check_volume.py",
-                    "examples/check_versions.py",
-                    "examples/check_kernels.py",
-                    "examples/check_directions.py"
                 ],
         long_description=open('README.rst').read(),
         install_requires=[

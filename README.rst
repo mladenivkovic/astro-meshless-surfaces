@@ -9,15 +9,17 @@ meshless methods of particle hydrodynamics the Hopkins 2015 way
 It's only written for 2d computations.
 
 It's meant to test things out, generate some plots etc, not to be used for 
-serious computations.
+serious computations. (Although I have recently extended it to work with numba, 
+so bigger computations are feasible now.)
 
 Also includes simple reading-in functions for SWIFT (https://ascl.net/1805.020) 
 hdf5 output.
 
 
 I haven't written any sort of documentation apart from docstrings. If you
-want to know something, feel free to contact me anytime. Otherwise, there
-are some usecase examples in ``/examples``
+want to know something, feel free to contact me (mladen.ivkovic[at]hotmail[dot]com) 
+anytime, or leave a bug/issue on https://github.com/mladenivkovic/astro-meshless-surfaces. 
+Otherwise, there are some usecase examples in ``/examples``.
 
 
 

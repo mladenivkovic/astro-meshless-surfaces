@@ -9,12 +9,7 @@
 
 import numpy as np
 import matplotlib.pyplot as plt
-
-try:
-    import meshless as ms
-except ImportError:
-    print("Didn't find 'meshless' module... be sure to add it to your pythonpath!")
-    quit(2)
+import astro_meshless_surfaces as ml
 
 
 # ---------------------------
@@ -30,24 +25,24 @@ pcoord = np.array([0.5, 0.5])  # coordinates of particle to work for
 
 def main():
 
-    x, y, h, rho, m, ids, npart = ms.read_file(srcfile, ptype)
-    pind = ms.find_index(x, y, pcoord)
+    x, y, h, rho, m, ids, npart = ml.read_file(srcfile, ptype)
+    pind = ml.find_index(x, y, pcoord)
 
     npart = x.shape[0]
 
-    kernels = ms.kernels
+    kernels = ml.kernels
 
     for k, kernel in enumerate(kernels):
 
         # transform smoothing lengths to kernel radius
-        H = ms.get_H(h, kernel)
+        H = ml.get_H(h, kernel)
 
         # compute all psi_i(x_j) for all i, j
         psi_i_at_j = np.zeros((npart, npart))
 
         for i in range(npart):
             for j in range(npart):
-                psi_i_at_j[i, j] = ms.psi(x[j], y[j], x[i], y[i], H[j], kernel)
+                psi_i_at_j[i, j] = ml.psi(x[j], y[j], x[i], y[i], H[j], kernel)
 
         omega = np.zeros(npart)
 
@@ -59,7 +54,7 @@ def main():
             # omega_i = sum_j W(x_i - x_j) = sum_j psi_j(x_i) as it is currently stored in memory
 
         # compute volumes from swift data
-        V_i = ms.V(pind, m, rho)
+        V_i = ml.V(pind, m, rho)
         V_tot_array = np.sum(m / rho)
 
         # compute volumes from computed data

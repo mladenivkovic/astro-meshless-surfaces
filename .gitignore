@@ -2,4 +2,5 @@ astro_meshless_surfaces.egg-info
 build/
 dist/
 meshless/__pycache__/
+astro_meshless_surfaces/__pycache__/
 .idea/

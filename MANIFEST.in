@@ -3,3 +3,10 @@ include *.txt *.md
 include examples/snapshot_perturbed.hdf5
 include examples/snapshot_uniform.hdf5
 include examples/snapshot_sodshock.hdf5
+include examples/example_ivanova.py
+include examples/example_hopkins.py
+include examples/check_volume.py
+include examples/check_versions.py
+include examples/check_kernels.py
+include examples/check_directions.py
+
