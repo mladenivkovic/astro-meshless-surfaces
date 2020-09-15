@@ -60,9 +60,7 @@ fullcolorlist = [
 ncolrs = len(fullcolorlist)
 
 
-# ========================
 def main():
-    # ========================
 
     x, y, h, rho, m, ids, npart = ms.read_file(srcfile, ptype)
 
@@ -78,13 +76,13 @@ def main():
 
         print("Working for particle at", pcoord)
 
-        pind = ms.find_index(x, y, pcoord, tolerance=0.05)
+        pind = ms.find_index(x, y, pcoord)
         tree, nbors = ms.find_neighbours(pind, x, y, H)
 
         print("Computing effective surfaces")
 
         A_ij_Hopkins = ms.Aij_Hopkins(pind, x, y, H, m, rho, tree=tree)
-        A_ij_Ivanova = ms.Aij_Ivanova(pind, x, y, H, m, rho, tree=tree)
+        A_ij_Ivanova = ms.Aij_Ivanova(pind, x, y, H, tree=tree)
 
         x_ij = ms.x_ij(pind, x, y, H, nbors=nbors)
 

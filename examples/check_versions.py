@@ -75,22 +75,22 @@ def main():
     tree = ms.get_tree(x, y)
 
     # compute full ivanova only once
-    Aij_Ivanova_v2_full, nbors_all = ms.Aij_Ivanova_all(x, y, H, m, rho, tree=tree)
+    Aij_Ivanova_v2_full, nbors_all = ms.Aij_Ivanova_all(x, y, H, tree=tree)
 
     count = 0
     for row, pcoord in enumerate(pcoords):
 
         print("Working for particle at", pcoord)
 
-        pind = ms.find_index(x, y, pcoord, tolerance=0.05)
-        nbors = nbors_all[pind]
+        pind = ms.find_index(x, y, pcoord)
+        tree, nbors = ms.find_neighbours(pind, x, y, H, tree=tree)
 
         print("Computing effective surfaces")
 
         Aij_Hopkins = ms.Aij_Hopkins(pind, x, y, H, m, rho, tree=tree)
         Aij_Hopkins_v2 = ms.Aij_Hopkins_v2(pind, x, y, H, m, rho, tree=tree)
-        Aij_Ivanova = ms.Aij_Ivanova(pind, x, y, H, m, rho, tree=tree)
-        Aij_Ivanova_v2 = Aij_Ivanova_v2_full[pind][: len(nbors)]
+        Aij_Ivanova = ms.Aij_Ivanova(pind, x, y, H, tree=tree)
+        Aij_Ivanova_v2 = Aij_Ivanova_v2_full[pind][: nbors.shape[0]]
 
         x_ij = ms.x_ij(pind, x, y, H, nbors=nbors)
 

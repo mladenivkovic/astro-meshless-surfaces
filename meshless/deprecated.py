@@ -422,7 +422,7 @@ def get_grad_psi_j_at_i_analytical_old(
     W_j_at_i,
     neighbour_data,
     kernel="cubic_spline",
-    L: List = (1.0, 1.0),
+    L: np.ndarray = np.ones(2),
     periodic=True,
 ):
     """
@@ -500,7 +500,7 @@ def get_grad_psi_j_at_i_analytical_old(
     return grad_psi_j_at_i
 
 
-def get_neighbour_data_for_all(x, y, h, L: List = (1.0, 1.0), periodic=True):
+def get_neighbour_data_for_all(x, y, h, L: np.ndarray = np.ones(2), periodic=True):
     """
     Gets all the neighbour data for all particles ready.
     Assumes domain is a rectangle with boxsize L[0], L[1].
@@ -798,7 +798,7 @@ def get_neighbour_data_for_all_naive(
     x: np.ndarray,
     y: np.ndarray,
     h: np.ndarray,
-    L: List = (1.0, 1.0),
+    L: np.ndarray = np.ones(2),
     periodic: bool = True,
 ):
     """

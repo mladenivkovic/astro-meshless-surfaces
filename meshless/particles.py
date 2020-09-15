@@ -19,9 +19,7 @@ from scipy.spatial import cKDTree
 
 
 @jit(nopython=True)
-def find_index(
-        x: np.ndarray, y: np.ndarray, pcoord: np.ndarray
-):
+def find_index(x: np.ndarray, y: np.ndarray, pcoord: np.ndarray):
     """
     Find the index in the read-in arrays where
     the particle with coordinates of your choice is
@@ -79,13 +77,13 @@ def find_index_by_id(ids: np.ndarray, id_to_look_for: int):
 
 
 def find_neighbours(
-        ind: int,
-        x: np.ndarray,
-        y: np.ndarray,
-        H: np.ndarray,
-        tree: Union[None, cKDTree] = None,
-        L: List = (1.0, 1.0),
-        periodic: bool = True,
+    ind: int,
+    x: np.ndarray,
+    y: np.ndarray,
+    H: np.ndarray,
+    tree: Union[None, cKDTree] = None,
+    L: np.ndarray = np.ones(2),
+    periodic: bool = True,
 ):
     """
     Find indices of all neighbours of a particle with index ind
@@ -123,31 +121,32 @@ def find_neighbours(
     tree: scipy.spatial.cKDTree
         tree used to look for neighbours.
 
-    neigh: List
-        list of neighbour indices.
+    neigh: np.ndarray
+        array of neighbour indices.
 
     """
 
     if tree is None:
         tree = get_tree(x, y, L=L, periodic=periodic)
 
-    ns = tree.query_ball_point([x[ind], y[ind]], H[ind], n_jobs=-1, )
+    ns = tree.query_ball_point([x[ind], y[ind]], H[ind], n_jobs=-1,)
 
     ns.remove(ind)  # remove yourself
     ns.sort()
+    neigh = np.array(ns, dtype=np.int)
 
-    return tree, List(ns)
+    return tree, neigh
 
 
 def find_neighbours_arbitrary_x(
-        x0: float,
-        y0: float,
-        x: np.ndarray,
-        y: np.ndarray,
-        H: float,
-        tree: Union[cKDTree, None] = None,
-        L: List = (1.0, 1.0),
-        periodic=True,
+    x0: float,
+    y0: float,
+    x: np.ndarray,
+    y: np.ndarray,
+    H: float,
+    tree: Union[cKDTree, None] = None,
+    L: np.ndarray = np.ones(2),
+    periodic=True,
 ):
     """
     Find indices of all neighbours around position x0, y0
@@ -291,12 +290,12 @@ def find_added_particle(ids: np.ndarray):
 
 @jit(nopython=True)
 def get_dx(
-        x1: float,
-        x2: float,
-        y1: float,
-        y2: float,
-        L: List = (1.0, 1.0),
-        periodic: bool = True,
+    x1: float,
+    x2: float,
+    y1: float,
+    y2: float,
+    L: np.ndarray = np.ones(2),
+    periodic: bool = True,
 ):
     """
     Compute difference of vectors [x1 - x2, y1 - y2] while
@@ -349,14 +348,13 @@ def get_dx(
     return List((dx, dy))
 
 
-@jit(nopython=False, parallel=True, forceobj=True)
 def get_neighbours_for_all(
-        x: np.ndarray,
-        y: np.ndarray,
-        H: np.ndarray,
-        tree: Union[cKDTree, None] = None,
-        L: List = (1.0, 1.0),
-        periodic: bool = True,
+    x: np.ndarray,
+    y: np.ndarray,
+    H: np.ndarray,
+    tree: Union[cKDTree, None] = None,
+    L: np.ndarray = np.ones(2),
+    periodic: bool = True,
 ):
     """
     Find neighbours for all particles.
@@ -404,21 +402,29 @@ def get_neighbours_for_all(
     nparts = x.shape[0]
     maxneigh = 0
 
-    neighbours = List([List([1]) for _ in range(nparts)])
+    nlist = List([List([1]) for _ in range(nparts)])
+    nneigh = np.zeros(nparts, dtype=np.int)
 
     for p in prange(nparts):
         ns = tree.query_ball_point([x[p], y[p]], H[p], n_jobs=-1)
         ns.sort()
         ns.remove(p)  # remove yourself
 
-        neighbours[p] = List(ns)
-        if len(ns) > maxneigh:
-            maxneigh = len(ns)
+        nlist[p] = List(ns)
+        nneigh[p] = len(ns)
 
-    return tree, neighbours, maxneigh
+    maxneigh = nneigh.max()
+    neighbours = np.zeros(nparts * maxneigh, dtype=np.int).reshape((nparts, maxneigh))
+
+    for p in prange(nparts):
+        neighbours[p][: nneigh[p]] = nlist[p][: nneigh[p]]
+
+    return tree, neighbours, nneigh
 
 
-def get_tree(x: np.ndarray, y: np.ndarray, L: List = (1.0, 1.0), periodic: bool = True):
+def get_tree(
+    x: np.ndarray, y: np.ndarray, L: np.ndarray = np.ones(2), periodic: bool = True
+):
     """
     Generate the KDTree to be queried for neighbour searches.
 

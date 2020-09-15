@@ -78,7 +78,7 @@ def main():
 
     print("Computing effective surfaces")
 
-    A_ij = ms.Aij_Ivanova(pind, x, y, H, m, rho, tree=tree)
+    A_ij = ms.Aij_Ivanova(pind, x, y, H, tree=tree)
     x_ij = ms.x_ij(pind, x, y, H, nbors=nbors)
 
     print("Plotting")

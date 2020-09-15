@@ -26,16 +26,16 @@ import numpy as np
 
 
 def Aij_Hopkins(
-        pind: int,
-        x: np.ndarray,
-        y: np.ndarray,
-        H: np.ndarray,
-        m: np.ndarray,
-        rho: np.ndarray,
-        tree: Union[None, cKDTree] = None,
-        kernel="cubic_spline",
-        L: List = (1.0, 1.0),
-        periodic=True,
+    pind: int,
+    x: np.ndarray,
+    y: np.ndarray,
+    H: np.ndarray,
+    m: np.ndarray,
+    rho: np.ndarray,
+    tree: Union[None, cKDTree] = None,
+    kernel="cubic_spline",
+    L: np.ndarray = np.ones(2),
+    periodic=True,
 ):
     """
     Compute A_ij as defined by Hopkins 2015
@@ -78,11 +78,14 @@ def Aij_Hopkins(
     -------
 
     A_ij: np.ndarray
-        array of A_ij, containing x and y component for every neighbour j of particle i
+        array of A_ij, containing x and y component for every neighbour j of 
+        particle i. Returns only neighbours within compact support radius of
+        particle i.
     """
 
+    # find neighbours
     tree, nbors = find_neighbours(pind, x, y, H, tree=tree, L=L, periodic=periodic)
-
+    nneigh = nbors.shape[0]
     xj = x[nbors]
     yj = y[nbors]
 
@@ -96,7 +99,9 @@ def Aij_Hopkins(
     )
 
     # normalize psi_j
-    omega_xi = np.sum(psi_j) + psi(0.0, 0.0, 0.0, 0.0, H[pind], kernel)
+    omega_xi = np.sum(psi_j) + psi(
+        0.0, 0.0, 0.0, 0.0, H[pind], kernel=kernel, periodic=periodic
+    )
     psi_j /= omega_xi
     psi_j = np.atleast_1d(psi_j)
 
@@ -104,71 +109,75 @@ def Aij_Hopkins(
     B_i = get_matrix(x[pind], y[pind], xj, yj, psi_j, L=L, periodic=periodic)
 
     # compute psi_tilde_j(x_i)
-    psi_tilde_j = np.empty(len(nbors) * 2).reshape((len(nbors), 2))
-    for i, n in enumerate(nbors):
+    psi_tilde_j = np.empty(nneigh * 2).reshape((nneigh, 2))
+    for i in prange(nneigh):
+        n = nbors[i]
         dx = np.array([xj[i] - x[pind], yj[i] - y[pind]])
         psi_tilde_j[i] = np.dot(B_i, dx) * psi_j[i]
 
-    # ---------------------------------------------------------------------------
+    # --------------------------------------------------------------------------
     # Part 2: values of psi/psi_tilde of particle i at neighbour positions x_j
-    # ---------------------------------------------------------------------------
+    # --------------------------------------------------------------------------
 
-    psi_i = np.zeros(len(nbors))  # psi_i(xj)
-    psi_tilde_i = np.empty(len(nbors) * 2).reshape((len(nbors), 2))  # psi_tilde_i(x_j)
+    psi_i = np.zeros(nneigh)  # psi_i(xj)
+    psi_tilde_i = np.empty(nneigh * 2).reshape((nneigh, 2))  # psi_tilde_i(x_j)
 
-    for i, n in enumerate(nbors):
+    for j in prange(nneigh):
+        nj = nbors[j]
         # first compute all psi(xj) from neighbour's neighbours to get weight omega
-        tree, nneigh = find_neighbours(n, x, y, H, tree=tree, L=L, periodic=periodic)
-        xk = x[nneigh]
-        yk = y[nneigh]
+        tree, newneigh = find_neighbours(nj, x, y, H, tree=tree, L=L, periodic=periodic)
+        xk = x[newneigh]
+        yk = y[newneigh]
         nn = None
-        psi_k = np.zeros(len(nneigh))
-        for j, nn in enumerate(nneigh):
+        psi_k = np.zeros(newneigh.shape[0])
+        for k, nn in enumerate(newneigh):
             psi_k = compute_psi_j(
-                x[n], y[n], xk, yk, H[n], kernel, L=L, periodic=periodic
+                x[nj], y[nj], xk, yk, H[nj], kernel, L=L, periodic=periodic
             )
             if nn == pind:
                 # store psi_i, which is the psi for the particle whe chose at
                 # position xj; psi_i(xj)
-                psi_i[i] = psi_k[j]
+                psi_i[j] = psi_k[k]
 
-        omega_xj = np.sum(psi_k)
-        if nn is not None:
-            omega_xj += psi(0, 0, 0, 0, H[nn], kernel)
+        omega_xj = np.sum(psi_k) + psi(
+            0.0, 0.0, 0.0, 0.0, H[nj], kernel=kernel, L=L, periodic=periodic
+        )
 
-        psi_i[i] /= omega_xj
+        psi_i[j] /= omega_xj
         psi_k /= omega_xj
 
         # now compute B_j^{\alpha \beta}
-        B_j = get_matrix(x[n], y[n], xk, yk, psi_k, L=L, periodic=periodic)
+        B_j = get_matrix(x[nj], y[nj], xk, yk, psi_k, L=L, periodic=periodic)
 
         # get psi_i_tilde(x = x_j)
-        dx = np.array([x[pind] - x[n], y[pind] - y[n]])
-        psi_tilde_i[i] = np.dot(B_j, dx) * np.float(psi_i[i])
+        dx, dy = get_dx(x[pind], x[nj], y[pind], y[nj], L=L, periodic=periodic)
+        dvecx = np.array([dx, dy])
+        psi_tilde_i[j] = np.dot(B_j, dvecx) * psi_i[j]
 
     # -------------------------------
     # Part 3: Compute A_ij
     # -------------------------------
 
-    A_ij = np.empty(len(nbors) * 2).reshape((len(nbors), 2))
+    A_ij = np.empty(nneigh * 2).reshape((nneigh, 2))
 
-    for i, n in enumerate(nbors):
+    for i in prange(nneigh):
+        n = nbors[i]
         A_ij[i] = V(pind, m, rho) * psi_tilde_j[i] - V(n, m, rho) * psi_tilde_i[i]
 
     return A_ij
 
 
 def Aij_Hopkins_v2(
-        pind: int,
-        x: np.ndarray,
-        y: np.ndarray,
-        H: np.ndarray,
-        m: np.ndarray,
-        rho: np.ndarray,
-        tree: Union[None, cKDTree],
-        kernel: str = "cubic_spline",
-        L: List = (1.0, 1.0),
-        periodic=True,
+    pind: int,
+    x: np.ndarray,
+    y: np.ndarray,
+    H: np.ndarray,
+    m: np.ndarray,
+    rho: np.ndarray,
+    tree: Union[None, cKDTree],
+    kernel: str = "cubic_spline",
+    L: np.ndarray = np.ones(2),
+    periodic=True,
 ):
     """
     Compute A_ij as defined by Hopkins 2015, second version.
@@ -224,68 +233,74 @@ def Aij_Hopkins_v2(
     # second index: index of x_l: psi(x_l)
     psi_k_at_l = np.zeros(npart * npart).reshape((npart, npart))
 
-    for k in range(npart):
-        for l in range(npart):
-            # kernels are symmetric in x_i, x_j, but h can vary!!!!
+    for k in prange(npart):
+        for l in range(k, npart):
+            # kernels are symmetric in x_i, x_j, but h can vary.
+            # So we can't do a symmetric thingy.
             psi_k_at_l[k, l] = psi(
                 x[l], y[l], x[k], y[k], H[l], kernel=kernel, L=L, periodic=periodic,
             )
+            psi_k_at_l[l, k] = psi(
+                x[l], y[l], x[k], y[k], H[k], kernel=kernel, L=L, periodic=periodic,
+            )
 
-    tree, neighbours, maxneigh = get_neighbours_for_all(
+    tree, neighbours, nneigh = get_neighbours_for_all(
         x, y, H, tree=tree, L=L, periodic=periodic
     )
+    maxneigh = neighbours.shape[1]
     omega = np.zeros(npart)
 
-    for l in range(npart):
+    for l in prange(npart):
         # compute normalisation omega for all particles
         # needs psi_k_at_l to be computed already
         omega[l] = np.sum(psi_k_at_l[:, l])
         # omega_k = sum_l W(x_k - x_l, h_k) = sum_l psi_l(x_k) as it is currently stored in memory
 
     # normalize psi's and convert to float for linalg module
-    for k in range(npart):
+    for k in prange(npart):
         psi_k_at_l[:, k] /= omega[k]
 
     # compute all matrices B_k
-    B_k = List([np.array([[0.0, 0.0], [0.0, 0.0]]) for _ in range(npart)])
-    for k in range(npart):
-        nbors = neighbours[k]
+    B_k = np.empty(npart * 2 * 2).reshape(npart, 2, 2)
+    for k in prange(npart):
+        nbors = neighbours[k][: nneigh[k]]
         # nbors now contains all neighbours l
-        psi_to_use = psi_k_at_l[nbors, k]
         B_k[k] = get_matrix(
-            x[k], y[k], x[nbors], y[nbors], psi_to_use, L=L, periodic=periodic
+            x[k], y[k], x[nbors], y[nbors], psi_k_at_l[nbors, k], L=L, periodic=periodic
         )
 
     # compute all psi_tilde_k at every l
     psi_tilde_k_at_l = np.zeros(npart * npart * 2).reshape((npart, npart, 2))
-    for k in range(npart):
+    for k in prange(npart):
         for l in range(npart):
             dx, dy = get_dx(x[k], x[l], y[k], y[l], L=L, periodic=periodic)
             dvecx = np.array([dx, dy])
             psi_tilde_k_at_l[k, l] = np.dot(B_k[l], dvecx) * psi_k_at_l[k, l]
 
     # now compute A_ij for all neighbours j of i
-    nbors = neighbours[pind]
+    nbors = neighbours[pind][: nneigh[pind]]
 
-    A_ij = np.zeros(len(nbors) * 2).reshape((len(nbors), 2))
+    A_ij = np.zeros(nneigh[pind] * 2).reshape((nneigh[pind], 2))
 
-    for i, j in enumerate(nbors):
+    for i in prange(nneigh[pind]):
+        j = nbors[i]
         A_ij[i] = (
-                V(pind, m, rho) * psi_tilde_k_at_l[j, pind]
-                - V(j, m, rho) * psi_tilde_k_at_l[pind, j]
+            V(pind, m, rho) * psi_tilde_k_at_l[j, pind]
+            - V(j, m, rho) * psi_tilde_k_at_l[pind, j]
         )
 
     return A_ij
 
-@jit(nopython=False, parallel=True, forceobj=True)
+
+#  @jit(nopython=False, parallel=True, forceobj=True)
 def Aij_Ivanova_all(
-        x: np.ndarray,
-        y: np.ndarray,
-        H: np.ndarray,
-        tree: Union[None, cKDTree] = None,
-        kernel: str = "cubic_spline",
-        L: List = (1.0, 1.0),
-        periodic: bool = True,
+    x: np.ndarray,
+    y: np.ndarray,
+    H: np.ndarray,
+    tree: Union[None, cKDTree] = None,
+    kernel: str = "cubic_spline",
+    L: np.ndarray = np.ones(2),
+    periodic: bool = True,
 ):
     """
     Compute A_ij as defined by Ivanova 2013, using the discretization by Taylor
@@ -332,29 +347,23 @@ def Aij_Ivanova_all(
 
     npart = x.shape[0]
 
-    tree, neighbours, maxneigh = get_neighbours_for_all(
+    tree, neighbours, nneigh = get_neighbours_for_all(
         x, y, H, tree=tree, L=L, periodic=periodic
     )
+
+    maxneigh = neighbours.shape[1]
 
     # compute all psi_j(x_i) for all i, j
     # first index: index j of psi: psi_j(x)
     # second index: index of x_i: psi(x_i)
 
     W_j_at_i, omega = get_W_j_at_i(
-        x, y, H, neighbours, maxneigh, kernel=kernel, L=L, periodic=periodic
+        x, y, H, neighbours, nneigh, kernel=kernel, L=L, periodic=periodic
     )
 
     # get gradients
     grad_psi_j_at_i = get_grad_psi_j_at_i_analytical(
-        x,
-        y,
-        H,
-        omega,
-        W_j_at_i,
-        neighbours,
-        maxneigh,
-        kernel=kernel,
-        periodic=periodic,
+        x, y, H, omega, W_j_at_i, neighbours, nneigh, kernel=kernel, periodic=periodic,
     )
 
     A_ij = np.zeros(npart * maxneigh * 2).reshape((npart, maxneigh, 2))
@@ -374,22 +383,24 @@ def Aij_Ivanova_all(
         for j, nj in enumerate(nbors):
 
             A_ij[i, j] += V_i * grad_psi_j_at_i[i, j]
+
             if i in neighbours[nj]:  # j may be neighbour of i, but not vice versa
-                iind = neighbours[nj].index(i)
+                iind = neighbours[nj] == i
+                iind[nneigh[nj] :] = False
                 A_ij[nj, iind] -= V_i * grad_psi_j_at_i[i, j]
 
     return A_ij, neighbours
 
 
 def Aij_Ivanova(
-        pind: int,
-        x: np.ndarray,
-        y: np.ndarray,
-        H: np.ndarray,
-        tree: Union[None, cKDTree] = None,
-        kernel="cubic_spline",
-        L: List = (1.0, 1.0),
-        periodic: bool = True,
+    pind: int,
+    x: np.ndarray,
+    y: np.ndarray,
+    H: np.ndarray,
+    tree: Union[None, cKDTree] = None,
+    kernel="cubic_spline",
+    L: np.ndarray = np.ones(2),
+    periodic: bool = True,
 ):
     """
     Compute A_ij as defined by Ivanova 2013, using the discretization by Taylor
@@ -433,61 +444,118 @@ def Aij_Ivanova(
         !! important: indices i and j are switched compared to definition in Ivanova 2013
     """
 
-    # first get neighbour data
-    tree, neighbours, maxneigh = get_neighbours_for_all(
-        x, y, H, tree=tree, L=L, periodic=periodic
+    # find neighbours
+    tree, nbors = find_neighbours(pind, x, y, H, tree=tree, L=L, periodic=periodic)
+    nneigh = nbors.shape[0]
+    xj = x[nbors]
+    yj = y[nbors]
+
+    # -------------------------------------------------------
+    # Part 1: For particle at x_i (Our chosen particle)
+    # -------------------------------------------------------
+
+    # compute W_j(x_i)
+    W_j_at_i = compute_psi_j(
+        x[pind], y[pind], xj, yj, H[pind], kernel=kernel, L=L, periodic=periodic
     )
 
-    # compute all psi_j(x_i) for all i, j
-    # first index: index j of psi: psi_j(x)
-    # second index: index of x_i: psi(x_i)
-
-    W_j_at_i, omega = get_W_j_at_i(
-        x, y, H, neighbours, maxneigh, kernel=kernel, L=L, periodic=periodic
+    # normalization for psi_j
+    omega_xi = np.sum(W_j_at_i) + psi(
+        0.0, 0.0, 0.0, 0.0, H[pind], kernel=kernel, L=L, periodic=periodic
     )
 
-    # get gradients
-    grad_psi_j_at_i = get_grad_psi_j_at_i_analytical(
-        x,
-        y,
-        H,
-        omega,
-        W_j_at_i,
-        neighbours,
-        maxneigh,
-        kernel=kernel,
-        periodic=periodic,
+    # get gradient of psi_j's at x_i
+    grad_psi_j_at_i = np.zeros(nneigh * 2).reshape((nneigh, 2))
+    grad_W_j_at_i = np.zeros(nneigh * 2).reshape((nneigh, 2))
+    sum_grad_Wj_at_i = np.zeros(2)
+    for j in prange(nneigh):
+        nj = nbors[j]
+        # order is important here!
+        dx, dy = get_dx(x[pind], x[nj], y[pind], y[nj], L=L, periodic=periodic)
+        r = np.sqrt(dx ** 2 + dy ** 2)
+        dwdr = dWdr(r / H[pind], H[pind], kernel)
+
+        grad_W_j_at_i[j, 0] = dwdr * dx / r
+        grad_W_j_at_i[j, 1] = dwdr * dy / r
+
+        sum_grad_Wj_at_i += grad_W_j_at_i[j]
+
+    for j in prange(nneigh):
+        grad_psi_j_at_i[j, :] = (
+            grad_W_j_at_i[j, :] / omega_xi
+            - W_j_at_i[j] * sum_grad_Wj_at_i[:] / omega_xi ** 2
+        )
+
+    # --------------------------------------------------------------------------
+    # Part 2: get data for all neighbours
+    # --------------------------------------------------------------------------
+
+    W_i_at_j = compute_psi_i(
+        x[pind], y[pind], xj, yj, H[nbors], kernel=kernel, L=L, periodic=periodic
     )
+    omega_xj = np.zeros(nneigh)
+    grad_W_i_at_j = np.zeros(nneigh * 2).reshape((nneigh, 2))
+    sum_grad_Wk_at_j = np.zeros(nneigh * 2).reshape((nneigh, 2))
 
-    # now compute A_ij for all neighbours j of i
-    nbors = neighbours[pind]
-    A_ij = np.zeros(len(nbors) * 2).reshape((len(nbors), 2))
+    for j in prange(nneigh):
 
-    V_i = 1.0 / omega[pind]
+        # first get omega
+        nj = nbors[j]
+        tree, newneigh = find_neighbours(nj, x, y, H, tree=tree, L=L, periodic=periodic)
+        xk = x[newneigh]
+        yk = y[newneigh]
+        W_k_at_j = compute_psi_j(
+            x[nj], y[nj], xk, yk, H[nj], kernel, L=L, periodic=periodic
+        )
 
-    for j, nj in enumerate(nbors):
+        omega_xj[j] = np.sum(W_k_at_j) + psi(
+            0.0, 0.0, 0.0, 0.0, H[nj], kernel=kernel, L=L, periodic=periodic
+        )
 
-        grad_psi_j_xi = grad_psi_j_at_i[pind, j]
-        grad_psi_i_xj = 0.0
-        if pind in neighbours[nj]:  # j may be neighbour of i, but not vice versa
-            iind = neighbours[nj].index(pind)
-            grad_psi_i_xj = grad_psi_j_at_i[nj, iind]
+        for k, nk in enumerate(newneigh):
 
-        V_j = 1.0 / omega[nj]
+            # now get the gradient
+            # order is important here!
+            dx, dy = get_dx(x[nj], x[nk], y[nj], y[nk], L=L, periodic=periodic)
+            r = np.sqrt(dx ** 2 + dy ** 2)
+            dwdr = dWdr(r / H[nj], H[nj], kernel)
 
-        A_ij[j] = V_i * grad_psi_j_xi - V_j * grad_psi_i_xj
+            sum_grad_Wk_at_j[j, 0] += dwdr * dx / r
+            sum_grad_Wk_at_j[j, 1] += dwdr * dy / r
+
+            if nk == pind:
+                grad_W_i_at_j[j, 0] = dwdr * dx / r
+                grad_W_i_at_j[j, 1] = dwdr * dy / r
+
+    grad_psi_i_at_j = np.zeros(nneigh * 2).reshape((nneigh, 2))
+    for j in prange(nneigh):
+        grad_psi_i_at_j[j, :] = (
+            grad_W_i_at_j[j, :] / omega_xj[j]
+            - W_i_at_j[j] * sum_grad_Wk_at_j[j, :] / omega_xj[j] ** 2
+        )
+
+    # -------------------------------
+    # Part 3: Compute A_ij
+    # -------------------------------
+
+    A_ij = np.empty(nneigh * 2).reshape((nneigh, 2))
+
+    for j in prange(nneigh):
+        A_ij[j] = (
+            1.0 / omega_xi * grad_psi_j_at_i[j] - 1.0 / omega_xj[j] * grad_psi_i_at_j[j]
+        )
 
     return A_ij
 
 
 @jit(nopython=True)
 def x_ij(
-        pind: int,
-        x: np.ndarray,
-        y: np.ndarray,
-        H: np.ndarray,
-        nbors: Union[List, None] = None,
-        which: Union[int, None] = None,
+    pind: int,
+    x: np.ndarray,
+    y: np.ndarray,
+    H: np.ndarray,
+    nbors: Union[np.ndarray, None] = None,
+    which: Union[int, None] = None,
 ):
     """
     compute x_ij for all neighbours of particle with index pind.
@@ -553,14 +621,14 @@ def x_ij(
 
 @jit(nopython=True, parallel=True)
 def get_W_j_at_i(
-        x: np.ndarray,
-        y: np.ndarray,
-        H: np.ndarray,
-        neighbours: List,
-        maxneigh: int,
-        kernel: str = "cubic_spline",
-        L: List = (1.0, 1.0),
-        periodic: bool = True,
+    x: np.ndarray,
+    y: np.ndarray,
+    H: np.ndarray,
+    neighbours: np.ndarray,
+    nneigh: np.ndarray,
+    kernel: str = "cubic_spline",
+    L: np.ndarray = np.ones(2),
+    periodic: bool = True,
 ):
     """
     Evaluate kernels between all neighbour pairs at their positions,
@@ -578,11 +646,11 @@ def get_W_j_at_i(
     H: numpy.ndarray
         kernel support radii
 
-    neighbours: List
-        List of lists of particle neighbour indexes
+    neighbours: np.ndarray
+        array of particle neighbour indexes for all particles
 
-    maxneigh: integer
-        maximal number of neighbours any particle has
+    nneigh: np.ndarray
+        array containing how many neighbours each particle has
 
     kernel: str
         which kernel to use
@@ -598,7 +666,7 @@ def get_W_j_at_i(
     -------
 
     W_j_at_i: np.ndarray
-        array of shape (npart, maxneigh) with evaluated kernel values
+        array of shape (part, maxneigh) with evaluated kernel values
         for all neighbours.
 
     omega: np.ndarray
@@ -606,16 +674,17 @@ def get_W_j_at_i(
 
     """
 
-    npart = x.shape[0]
+    npart = neighbours.shape[0]
+    maxneigh = neighbours.shape[1]
 
     W_j_at_i = np.zeros(npart * maxneigh).reshape(npart, maxneigh)
     omega = np.zeros(npart)
 
     for j in prange(npart):
-        nn = len(neighbours[j])
-        for i in range(nn):
+        for i in range(nneigh[j]):
             ind_n = neighbours[j][i]
-            # kernels are symmetric in x_i, x_j, but h can vary!!!!
+            # kernels are symmetric in x_i, x_j, but h can vary.
+            # So we can't make this symmetric.
             W_j_at_i[j, i] = psi(
                 x[j],
                 y[j],
@@ -635,16 +704,16 @@ def get_W_j_at_i(
 
 @jit(nopython=True, parallel=True)
 def get_grad_psi_j_at_i_analytical(
-        x: np.ndarray,
-        y: np.ndarray,
-        H: np.ndarray,
-        omega: np.ndarray,
-        W_j_at_i: np.ndarray,
-        neighbours: List,
-        maxneigh: int,
-        kernel="cubic_spline",
-        L: List = (1.0, 1.0),
-        periodic: bool = True,
+    x: np.ndarray,
+    y: np.ndarray,
+    H: np.ndarray,
+    omega: np.ndarray,
+    W_j_at_i: np.ndarray,
+    neighbours: np.ndarray,
+    nneigh: np.ndarray,
+    kernel="cubic_spline",
+    L: np.ndarray = np.ones(2),
+    periodic: bool = True,
 ):
     """
     Compute `\\nabla \\psi_k (x_l)` for all particles k and l
@@ -667,11 +736,11 @@ def get_grad_psi_j_at_i_analytical(
     W_j_at_i: np.ndarray
         W_k(x_l) : npart x npart array
 
-    neighbours: List
-        list of lists of neighbour indices
+    neighbours: np.ndarray
+        array of particle neighbour indexes for all particles
 
-    maxneigh: integer
-        highest number of neighbours any particle has
+    nneigh: np.ndarray
+        array containing how many neighbours each particle has
 
     kernel: str
         which kernel to use
@@ -691,6 +760,7 @@ def get_grad_psi_j_at_i_analytical(
         all i,j for both x and y direction
     """
     npart = x.shape[0]
+    maxneigh = neighbours.shape[1]
 
     # gradient of psi_j at neighbour i's position
     grad_psi_j_at_i = np.zeros(npart * maxneigh * 2).reshape((npart, maxneigh, 2))
@@ -700,7 +770,8 @@ def get_grad_psi_j_at_i_analytical(
     sum_grad_W = np.zeros(npart * 2).reshape((npart, 2))
 
     for j in prange(npart):
-        for i, ind_n in enumerate(neighbours[j]):
+        for i in range(nneigh[j]):
+            ind_n = neighbours[j, i]
             dx, dy = get_dx(x[j], x[ind_n], y[j], y[ind_n], L=L, periodic=periodic)
             r = np.sqrt(dx ** 2 + dy ** 2)
 
@@ -713,14 +784,10 @@ def get_grad_psi_j_at_i_analytical(
 
     # finish computing the gradients: Need W(r, h), which is currently stored as psi
     for j in prange(npart):
-        for i, ind_n in enumerate(neighbours[j]):
-            grad_psi_j_at_i[j, i, 0] = (
-                    grad_W_j_at_i[j, i, 0] / omega[j]
-                    - W_j_at_i[j, i] * sum_grad_W[j, 0] / omega[j] ** 2
-            )
-            grad_psi_j_at_i[j, i, 1] = (
-                    grad_W_j_at_i[j, i, 1] / omega[j]
-                    - W_j_at_i[j, i] * sum_grad_W[j, 1] / omega[j] ** 2
+        for i in range(nneigh[j]):
+            grad_psi_j_at_i[j, i, :] = (
+                grad_W_j_at_i[j, i, :] / omega[j]
+                - W_j_at_i[j, i] * sum_grad_W[j, :] / omega[j] ** 2
             )
 
     return grad_psi_j_at_i
@@ -728,14 +795,14 @@ def get_grad_psi_j_at_i_analytical(
 
 @jit(nopython=True, parallel=True)
 def compute_psi_j(
-        xi: float,
-        yi: float,
-        xj: np.ndarray,
-        yj: np.ndarray,
-        Hi: float,
-        kernel: str = "cubic_spline",
-        L: List = (1.0, 1.0),
-        periodic: bool = True,
+    xi: float,
+    yi: float,
+    xj: np.ndarray,
+    yj: np.ndarray,
+    Hi: float,
+    kernel: str = "cubic_spline",
+    L: np.ndarray = np.ones(2),
+    periodic: bool = True,
 ):
     """
     Compute psi_j(x_i) for all j, i.e.
@@ -787,14 +854,14 @@ def compute_psi_j(
 
 @jit(nopython=True, parallel=True)
 def compute_psi_i(
-        xi: float,
-        yi: float,
-        xj: np.ndarray,
-        yj: np.ndarray,
-        Hj: np.ndarray,
-        kernel: str = "cubic_spline",
-        L: List = (1.0, 1.0),
-        periodic: bool = True,
+    xi: float,
+    yi: float,
+    xj: np.ndarray,
+    yj: np.ndarray,
+    Hj: np.ndarray,
+    kernel: str = "cubic_spline",
+    L: np.ndarray = np.ones(2),
+    periodic: bool = True,
 ):
     """
     Compute psi_i(x_j) for all j, i.e.
@@ -848,14 +915,14 @@ def compute_psi_i(
 
 @jit(nopython=True)
 def psi(
-        xi: float,
-        yi: float,
-        xj: float,
-        yj: float,
-        Hi: float,
-        kernel: str = "cubic_spline",
-        L: List = (1.0, 1.0),
-        periodic: bool = True,
+    xi: float,
+    yi: float,
+    xj: float,
+    yj: float,
+    Hi: float,
+    kernel: str = "cubic_spline",
+    L: np.ndarray = np.ones(2),
+    periodic: bool = True,
 ):
     """
     UNNORMALIZED Volume fraction at position x of some particle
@@ -907,13 +974,13 @@ def psi(
 
 @jit(nopython=True, parallel=True)
 def get_matrix(
-        xi: float,
-        yi: float,
-        xj: np.ndarray,
-        yj: np.ndarray,
-        psi_j: np.ndarray,
-        L: List = (1.0, 1.0),
-        periodic: bool = True,
+    xi: float,
+    yi: float,
+    xj: np.ndarray,
+    yj: np.ndarray,
+    psi_j: np.ndarray,
+    L: np.ndarray = np.ones(2),
+    periodic: bool = True,
 ):
     """
     Get B_i ^{alpha beta}
@@ -967,14 +1034,14 @@ def get_matrix(
 
 @jit(nopython=True)
 def h_of_x(
-        xx: float,
-        yy: float,
-        x: np.ndarray,
-        y: np.ndarray,
-        h: np.ndarray,
-        kernel="cubic_spline",
-        L: List = (1.0, 1.0),
-        periodic: bool = True,
+    xx: float,
+    yy: float,
+    x: np.ndarray,
+    y: np.ndarray,
+    h: np.ndarray,
+    kernel="cubic_spline",
+    L: np.ndarray = np.ones(2),
+    periodic: bool = True,
 ):
     """
     Compute h(x) at position (xx, yy), where there is
