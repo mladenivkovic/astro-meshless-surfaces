@@ -17,5 +17,6 @@ setup(
             'h5py',
             'scipy'
         ],
-        extras_requires = ['numba']
+        extras_requires = ['numba'],
+        urt="https://github.com/mladenivkovic/astro-meshless-surfaces", 
      )
