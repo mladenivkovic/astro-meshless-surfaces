@@ -207,8 +207,8 @@ def read_boxsize(fnamestr="_0000.hdf5"):
     Returns
     -------
 
-    boxsize: list
-        [xdim, ydim, zdim] list, where xdim, ydim, zdim are floats
+    boxsize: np.ndarray
+        [xdim, ydim, zdim] array, where xdim, ydim, zdim are floats
     """
 
     filelist = os.listdir()

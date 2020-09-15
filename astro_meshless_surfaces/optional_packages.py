@@ -4,7 +4,8 @@ Optional packages handling.
 
 try:
     from numba import jit, prange
-    from numba.typed import List
+
+    # from numba.typed import List
 
 except (ImportError, ModuleNotFoundError):
     print("No numba found. Consider installing it: pip install numba")
@@ -18,7 +19,7 @@ except (ImportError, ModuleNotFoundError):
     def prange(*args, **kwargs):
         return range(*args, **kwargs)
 
-    List = tuple
+    # List = tuple
 
 
 #

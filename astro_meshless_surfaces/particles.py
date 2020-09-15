@@ -13,7 +13,7 @@
 ###########################################################################################
 
 import numpy as np
-from .optional_packages import jit, List, prange
+from .optional_packages import jit, prange
 from typing import Union
 from scipy.spatial import cKDTree
 
@@ -129,7 +129,7 @@ def find_neighbours(
     if tree is None:
         tree = get_tree(x, y, L=L, periodic=periodic)
 
-    ns = tree.query_ball_point([x[ind], y[ind]], H[ind], n_jobs=-1,)
+    ns = tree.query_ball_point([x[ind], y[ind]], H[ind])
 
     ns.remove(ind)  # remove yourself
     ns.sort()
@@ -186,8 +186,8 @@ def find_neighbours_arbitrary_x(
     tree: scipy.spatial.cKDTree
         tree used to look up neighbours.
 
-    neighbours: list
-        list of lists of neighbour indices
+    neighbours: np.ndarray
+        array containing indices of neighbours
 
     """
 
@@ -196,10 +196,10 @@ def find_neighbours_arbitrary_x(
 
     coord = np.array([x0, y0])
 
-    ns = tree.query_ball_point(coord, H, n_jobs=-1)
+    ns = tree.query_ball_point(coord, H)
     ns.sort()
 
-    return tree, List(ns)
+    return tree, np.array(ns)
 
 
 def V(ind: int, m: np.ndarray, rho: np.ndarray):
@@ -228,22 +228,19 @@ def V(ind: int, m: np.ndarray, rho: np.ndarray):
     """
     V = m[ind] / rho[ind]
     if V > 1:
-        print(
-            "Got particle volume V=",
-            V,
-            ". Did you put the arguments in the correct places?",
-        )
+        print("Got particle volume V=", V)
+        print("Did you put the arguments in the correct places?")
     return V
 
 
-def find_central_particle(L: List, ids: np.ndarray):
+def find_central_particle(L: np.ndarray, ids: np.ndarray):
     """
     Find the index of the central particle at (0.5, 0.5)
 
     Parameters
     ----------
 
-    L: tuple
+    L: np.ndarray
         Boxlen
 
     ids: np.ndarray
@@ -315,7 +312,7 @@ def get_dx(
     y2: float
         y position of particle 2
 
-    L: tuple
+    L: np.ndarray
         boxsize
 
     periodic: bool
@@ -345,7 +342,7 @@ def get_dx(
         elif dy < -Lyhalf:
             dy += L[1]
 
-    return List((dx, dy))
+    return np.array((dx, dy))
 
 
 def get_neighbours_for_all(
@@ -388,11 +385,11 @@ def get_neighbours_for_all(
     tree: scipy.spatial.cKDTree
         tree used to look up neighbours.
 
-    neighbours: list
-        list of lists of neighbour indices
+    neighbours: np.ndarray
+        array of shape (npart, maxneigh) containing neighbour indices of each particle
 
-    maxneigh: int
-        highest number of neighbours any particle has
+    nneigh: np.ndarray(dtype=int)
+        number of neighbours each particle has.
 
     """
 
@@ -400,17 +397,15 @@ def get_neighbours_for_all(
         tree = get_tree(x, y, L=L, periodic=periodic)
 
     nparts = x.shape[0]
-    maxneigh = 0
 
-    nlist = List([List([1]) for _ in range(nparts)])
+    nlist = [[] for _ in range(nparts)]
     nneigh = np.zeros(nparts, dtype=np.int)
 
     for p in prange(nparts):
-        ns = tree.query_ball_point([x[p], y[p]], H[p], n_jobs=-1)
+        ns = tree.query_ball_point([x[p], y[p]], H[p])
         ns.sort()
         ns.remove(p)  # remove yourself
 
-        nlist[p] = List(ns)
         nneigh[p] = len(ns)
 
     maxneigh = nneigh.max()

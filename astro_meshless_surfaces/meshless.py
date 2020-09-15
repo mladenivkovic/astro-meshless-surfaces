@@ -19,7 +19,7 @@ visualisiation with 2d datasets.
 
 from .kernels import *
 from .particles import *
-from .optional_packages import jit, List, prange
+from .optional_packages import jit, prange
 
 from typing import Union
 import numpy as np
@@ -111,7 +111,6 @@ def Aij_Hopkins(
     # compute psi_tilde_j(x_i)
     psi_tilde_j = np.empty(nneigh * 2).reshape((nneigh, 2))
     for i in prange(nneigh):
-        n = nbors[i]
         dx = np.array([xj[i] - x[pind], yj[i] - y[pind]])
         psi_tilde_j[i] = np.dot(B_i, dx) * psi_j[i]
 
@@ -128,7 +127,6 @@ def Aij_Hopkins(
         tree, newneigh = find_neighbours(nj, x, y, H, tree=tree, L=L, periodic=periodic)
         xk = x[newneigh]
         yk = y[newneigh]
-        nn = None
         psi_k = np.zeros(newneigh.shape[0])
         for k, nn in enumerate(newneigh):
             psi_k = compute_psi_j(
@@ -247,7 +245,6 @@ def Aij_Hopkins_v2(
     tree, neighbours, nneigh = get_neighbours_for_all(
         x, y, H, tree=tree, L=L, periodic=periodic
     )
-    maxneigh = neighbours.shape[1]
     omega = np.zeros(npart)
 
     for l in prange(npart):
@@ -261,7 +258,7 @@ def Aij_Hopkins_v2(
         psi_k_at_l[:, k] /= omega[k]
 
     # compute all matrices B_k
-    B_k = np.empty(npart * 2 * 2).reshape(npart, 2, 2)
+    B_k = np.empty(npart * 2 * 2).reshape((npart, 2, 2))
     for k in prange(npart):
         nbors = neighbours[k][: nneigh[k]]
         # nbors now contains all neighbours l
@@ -341,8 +338,8 @@ def Aij_Ivanova_all(
         array of A_ij, containing x and y component for every neighbour j of every particle i
         ! important: indices i and j are switched compared to definition in Ivanova 2013
 
-    neighbours: list 
-        list of lists of neighbour indices for every particle i
+    neighbours: np.ndarray
+        array of shape (npart, maxneigh) of neighbour indices for every particle i
     """
 
     npart = x.shape[0]
@@ -577,8 +574,8 @@ def x_ij(
     H: numpy.ndarray
         kernel support radii
 
-    nbors: list or None
-        list of particle with index `pind`'s neighbours.
+    nbors: np.ndarray or None
+        array of particle with index `pind`'s neighbours.
         If `which` is `None`, `nbors` must be provided.
 
     which: int or None
@@ -615,7 +612,7 @@ def x_ij(
 
     else:
         raise ValueError(
-            "Gotta give me either a list of neighbours or a single particle info for x_ij"
+            "Gotta give me either an array of neighbours or a single particle info for x_ij"
         )
 
 
