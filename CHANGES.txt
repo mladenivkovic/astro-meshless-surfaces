@@ -1,3 +1,4 @@
+v0.1.16 17.09.2020 -- minor bugfixes.
 v0.1.15 14.09.2020 -- now using numba to speed things up and scipy.spatial.cKDTree for neighbour searches.
 v0.1.14 19.11.2019 -- added neighboursearch for non-square scenarios. Simplified ivanova versions. Indices overhaul in ivanova, now consistent with swift.
 v0.1.13 13.11.2019 -- fixed neighboursearch; forgot to un-comment iind search. Extended check_version.py
