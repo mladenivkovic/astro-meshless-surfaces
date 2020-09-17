@@ -14,6 +14,7 @@
 
 import numpy as np
 from .optional_packages import jit, prange
+from .kernels import kernel_H_over_h_dict
 from typing import Union
 from scipy.spatial import cKDTree
 
@@ -143,8 +144,9 @@ def find_neighbours_arbitrary_x(
     y0: float,
     x: np.ndarray,
     y: np.ndarray,
-    H: float,
+    eta: float,
     tree: Union[cKDTree, None] = None,
+    kernel: str = "cubic_spline",
     L: np.ndarray = np.ones(2),
     periodic=True,
 ):
@@ -167,8 +169,8 @@ def find_neighbours_arbitrary_x(
     y: numpy.ndarray
         particle y positions
 
-    H: float
-       kernel support radius around (x0, y0)
+    eta: float
+        resolution eta that determines the number of neighbours. 
 
     tree: scipy.spatial.cKDTree object or None
         tree to query. If none, one will be generated.
@@ -194,12 +196,87 @@ def find_neighbours_arbitrary_x(
     if tree is None:
         tree = get_tree(x, y, L=L, periodic=periodic)
 
+    xi = kernel_H_over_h_dict[kernel]
+    N = np.pi * (eta * xi) ** 2
+
     coord = np.array([x0, y0])
 
-    ns = tree.query_ball_point(coord, H)
+    dist, ns = tree.query(coord, N)
+
+    ns = ns[ns != x.shape[0]]  # if too few neighbours, it's marked with index npart
     ns.sort()
 
-    return tree, np.array(ns)
+    return tree, ns
+
+
+def H_of_x(
+    xx: float,
+    yy: float,
+    x: np.ndarray,
+    y: np.ndarray,
+    eta: float,
+    kernel="cubic_spline",
+    L: np.ndarray = np.ones(2),
+    periodic: bool = True,
+):
+    """
+    Compute h(x) at position (xx, yy), where there is
+    not necessariliy a particle
+    by approximating it as h(x) = sum_j h_j * psi_j(x)
+
+
+    Parameters
+    ----------
+
+    xx: float
+        x position to compute for
+
+    yy: float
+        y position to compute for
+
+    x: numpy.ndarray
+        particle x positions
+
+    y: numpy.ndarray
+        particle y positions
+
+    eta: numpy.ndarray
+        resolution eta. You can get it using read_eta_from_file()
+        or provide it yourself.
+
+    kernel: str
+        which kernel to use
+
+    L: Tuple
+        boxsize
+
+    periodic: bool
+        whether it's a periodic box
+
+
+    Returns
+    -------
+
+    tree: scipy.spatial.cKDTree
+        tree used to look up neighbours.
+
+    H: float
+        compact support radius at position (xx, yy)
+    """
+
+    if tree is None:
+        tree = get_tree(x, y, L=L, periodic=periodic)
+
+    xi = kernel_H_over_h_dict[kernel]
+    N = np.pi * (eta * xi) ** 2
+
+    coord = np.array([x0, y0])
+
+    dist, ns = tree.query(coord, N)
+    dist = dist[ns != x.shape[0]]  # if too few neighbours, it's marked with index npart
+    H = dist[-1]
+
+    return tree, H
 
 
 def V(ind: int, m: np.ndarray, rho: np.ndarray):
@@ -233,15 +310,15 @@ def V(ind: int, m: np.ndarray, rho: np.ndarray):
     return V
 
 
-def find_central_particle(L: np.ndarray, ids: np.ndarray):
+def find_central_particle(nparts: int, ids: np.ndarray):
     """
     Find the index of the central particle at (0.5, 0.5)
 
     Parameters
     ----------
 
-    L: np.ndarray
-        Boxlen
+    nparts: int
+        total number of particles
 
     ids: np.ndarray
         particle IDs
@@ -254,9 +331,10 @@ def find_central_particle(L: np.ndarray, ids: np.ndarray):
         index of central particle
     """
 
-    i = L[0] // 2 - 1
-    j = L[1] // 2 - 1
-    cid = i * L + j + 1
+    nx = int(np.sqrt(nparts) + 0.5)
+    i = nx // 2 - 1
+    j = nx // 2 - 1
+    cid = i * nx + j + 1
     cind = np.asscalar(np.where(ids == cid)[0])
 
     return cind
@@ -406,6 +484,7 @@ def get_neighbours_for_all(
         ns.sort()
         ns.remove(p)  # remove yourself
 
+        nlist[p] = ns
         nneigh[p] = len(ns)
 
     maxneigh = nneigh.max()

@@ -94,6 +94,35 @@ def read_file(srcfile: str, ptype: str = "PartType0", sort: bool = False):
     return x, y, h, rho, m, ids, npart
 
 
+def read_eta_from_file(srcfile: str, ptype: str = "PartType0"):
+    """
+    Read in the resolution eta from swift output hdf5 file.
+
+    Parameters
+    ----------
+    
+    srcfile: str
+        string of file to be read in
+
+    ptype: str
+        which particle type to work with
+ 
+
+    Returns
+    -------
+
+    eta: float
+        resolution eta read in from file
+
+    """
+
+    f = h5py.File(srcfile, "r")
+    hs = f["HydroScheme"]
+    eta = hs.attrs["Kernel eta"][0]
+
+    return eta
+
+
 def get_sample_size(prefix: Union[str, None] = None):
     """
     Count how many files we're dealing with.

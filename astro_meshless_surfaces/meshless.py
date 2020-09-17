@@ -172,7 +172,7 @@ def Aij_Hopkins_v2(
     H: np.ndarray,
     m: np.ndarray,
     rho: np.ndarray,
-    tree: Union[None, cKDTree],
+    tree: Union[None, cKDTree] = None,
     kernel: str = "cubic_spline",
     L: np.ndarray = np.ones(2),
     periodic=True,
@@ -289,7 +289,6 @@ def Aij_Hopkins_v2(
     return A_ij
 
 
-#  @jit(nopython=False, parallel=True, forceobj=True)
 def Aij_Ivanova_all(
     x: np.ndarray,
     y: np.ndarray,
@@ -340,6 +339,9 @@ def Aij_Ivanova_all(
 
     neighbours: np.ndarray
         array of shape (npart, maxneigh) of neighbour indices for every particle i
+
+    nneigh: np.ndarray
+        array of shape (npart) of number of neighbours of each particle
     """
 
     npart = x.shape[0]
@@ -386,7 +388,7 @@ def Aij_Ivanova_all(
                 iind[nneigh[nj] :] = False
                 A_ij[nj, iind] -= V_i * grad_psi_j_at_i[i, j]
 
-    return A_ij, neighbours
+    return A_ij, neighbours, nneigh
 
 
 def Aij_Ivanova(
@@ -1027,70 +1029,3 @@ def get_matrix(
     E = np.array([[E00, E01], [E01, E11]])
     B = np.linalg.inv(E)
     return B
-
-
-@jit(nopython=True)
-def h_of_x(
-    xx: float,
-    yy: float,
-    x: np.ndarray,
-    y: np.ndarray,
-    h: np.ndarray,
-    kernel="cubic_spline",
-    L: np.ndarray = np.ones(2),
-    periodic: bool = True,
-):
-    """
-    Compute h(x) at position (xx, yy), where there is
-    not necessariliy a particle
-    by approximating it as h(x) = sum_j h_j * psi_j(x)
-
-
-    Parameters
-    ----------
-
-    xx: float
-        x position to compute for
-
-    yy: float
-        y position to compute for
-
-    x: numpy.ndarray
-        particle x positions
-
-    y: numpy.ndarray
-        particle y positions
-
-    h: numpy.ndarray
-        kernel support radii
-
-    kernel: str
-        which kernel to use
-
-    L: Tuple
-        boxsize
-
-    periodic: bool
-
-
-    Returns
-    -------
-
-    hh: float
-        smoothing length at position (xx, yy)
-    """
-
-    # TODO: rewrite
-
-    nbors = find_neighbours_arbitrary_x(xx, yy, x, y, h, L=L, periodic=periodic)
-
-    xj = x[nbors]
-    yj = y[nbors]
-    hj = h[nbors]
-
-    psi_j = compute_psi_j(xx, yy, xj, yj, hj, kernel=kernel, L=L, periodic=periodic)
-    psi_j /= np.sum(psi_j)
-
-    hh = np.sum(hj * psi_j)
-
-    return hh

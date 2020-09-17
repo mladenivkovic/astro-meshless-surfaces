@@ -73,7 +73,7 @@ def main():
     tree = ml.get_tree(x, y)
 
     # compute full ivanova only once
-    Aij_Ivanova_v2_full, nbors_all = ml.Aij_Ivanova_all(x, y, H, tree=tree)
+    Aij_Ivanova_v2_full, nbors_all, nneigh = ml.Aij_Ivanova_all(x, y, H, tree=tree)
 
     count = 0
     for row, pcoord in enumerate(pcoords):

@@ -65,7 +65,7 @@ for i, kernel in enumerate(kernels_with_gaussian):
 
 
 @jit(nopython=True)
-def W(q: float, h: float, kernel: str = "cubic_spline"):
+def W(q: float, H: float, kernel: str = "cubic_spline"):
     """
     Evaluates various kernels.
     The kernels are scaled such that W(q > 1) = 0.
@@ -82,9 +82,9 @@ def W(q: float, h: float, kernel: str = "cubic_spline"):
     ----------
 
     q: float
-        dx / h, where dx is particle distance
+        dx / H, where dx is particle distance
 
-    h: float
+    H: float
         compact support radius at particle position.
         compact support radius, not smoothing length!
 
@@ -110,8 +110,8 @@ def W(q: float, h: float, kernel: str = "cubic_spline"):
         else:
             return 0
 
-        #  sigma = 80./(7*pi*h**2)
-        sigma = 3.63782727067189 / h ** 2
+        #  sigma = 80./(7*pi*H**2)
+        sigma = 3.63782727067189 / H ** 2
         return sigma * res
 
     elif kernel == "quartic_spline":
@@ -125,7 +125,7 @@ def W(q: float, h: float, kernel: str = "cubic_spline"):
         else:
             return 0
 
-        sigma = 5 ** 6 * 3 / (2398 * np.pi * h ** 2)
+        sigma = 5 ** 6 * 3 / (2398 * np.pi * H ** 2)
         return sigma * res
 
     elif kernel == "quintic_spline":
@@ -149,15 +149,15 @@ def W(q: float, h: float, kernel: str = "cubic_spline"):
         else:
             return 0
 
-        #  sigma = 3**7*7/(478*pi)/h**2
-        sigma = 10.1945733213130 / h ** 2
+        #  sigma = 3**7*7/(478*pi)/H**2
+        sigma = 10.1945733213130 / H ** 2
         return res * sigma
 
     elif kernel == "wendland_C2":
 
         if q < 1:
-            #  sigma = 7/(np.pi * h**2)
-            sigma = 2.228169203286535 / h ** 2
+            #  sigma = 7/(np.pi * H**2)
+            sigma = 2.228169203286535 / H ** 2
             qsq = q ** 2
             return sigma * (qsq * (qsq * (4 * q - 15) + 10 * (2 * q - 1)) + 1)
         else:
@@ -166,8 +166,8 @@ def W(q: float, h: float, kernel: str = "cubic_spline"):
     elif kernel == "wendland_C4":
 
         if q < 1:
-            #  sigma = 9/(np.pi*h**2)
-            sigma = 2.864788975654116 / h ** 2
+            #  sigma = 9/(np.pi*H**2)
+            sigma = 2.864788975654116 / H ** 2
             qsq = q ** 2
             q4 = qsq ** 2
 
@@ -186,8 +186,8 @@ def W(q: float, h: float, kernel: str = "cubic_spline"):
     elif kernel == "wendland_C6":
 
         if q < 1:
-            #  sigma = 78/(7*np.pi*h**2)
-            sigma = 3.546881588905096 / h ** 2
+            #  sigma = 78/(7*np.pi*H**2)
+            sigma = 3.546881588905096 / H ** 2
             return sigma * (
                 32 * q ** 11
                 - 231 * q ** 10
@@ -204,17 +204,17 @@ def W(q: float, h: float, kernel: str = "cubic_spline"):
 
     elif kernel == "gaussian":
         # gaussian without compact support
-        return 1.0 / np.sqrt(np.pi) ** 3 / h ** 2 * np.exp(-(q ** 2))
+        return 1.0 / np.sqrt(np.pi) ** 3 / H ** 2 * np.exp(-(q ** 2))
 
     else:
         raise ValueError("Didn't find kernel")
 
 
 @jit(nopython=True)
-def dWdr(q: float, h: float, kernel: str = "cubic_spline"):
+def dWdr(q: float, H: float, kernel: str = "cubic_spline"):
     """
     Evaluates kernel derivatives for various kernels:
-    returns dW/dr = dW/dq dq/dr = 1/h * dW/dq
+    returns dW/dr = dW/dq dq/dr = 1/H * dW/dq
 
     The kernels are scaled such that W(q > 1) = 0.
     Currently implemented:
@@ -230,9 +230,9 @@ def dWdr(q: float, h: float, kernel: str = "cubic_spline"):
     ----------
 
     q: float
-        dx / h, where dx is particle distance
+        dx / H, where dx is particle distance
 
-    h: float
+    H: float
         compact support radius at particle position.
         compact support radius, not smoothing length!
 
@@ -257,8 +257,8 @@ def dWdr(q: float, h: float, kernel: str = "cubic_spline"):
         else:
             return 0
 
-        #  sigma = 80./(7*pi*h**2) * 1 / h
-        sigma = 3.63782727067189 / h ** 3
+        #  sigma = 80./(7*pi*H**2) * 1 / H
+        sigma = 3.63782727067189 / H ** 3
         return sigma * res
 
     elif kernel == "quartic_spline":
@@ -272,7 +272,7 @@ def dWdr(q: float, h: float, kernel: str = "cubic_spline"):
         else:
             return 0
 
-        sigma = 5 ** 6 * 3 / (2398 * np.pi * h ** 3)
+        sigma = 5 ** 6 * 3 / (2398 * np.pi * H ** 3)
         return sigma * res
 
     elif kernel == "quintic_spline":
@@ -291,15 +291,15 @@ def dWdr(q: float, h: float, kernel: str = "cubic_spline"):
         else:
             return 0
 
-        #  sigma = 3**7*7/(478*pi)/h**2
-        sigma = 10.1945733213130 / h ** 3
+        #  sigma = 3**7*7/(478*pi)/H**2
+        sigma = 10.1945733213130 / H ** 3
         return res * sigma
 
     elif kernel == "wendland_C2":
 
         if q < 1:
-            #  sigma = 7/(np.pi * h**2)
-            sigma = 2.228169203286535 / h ** 3
+            #  sigma = 7/(np.pi * H**2)
+            sigma = 2.228169203286535 / H ** 3
             return sigma * (20 * q ** 4 - 60 * q ** 3 + 60 * q ** 2 - 20 * q)
         else:
             return 0
@@ -307,8 +307,8 @@ def dWdr(q: float, h: float, kernel: str = "cubic_spline"):
     elif kernel == "wendland_C4":
 
         if q < 1:
-            #  sigma = 9/(np.pi*h**2)
-            sigma = 2.864788975654116 / h ** 3
+            #  sigma = 9/(np.pi*H**2)
+            sigma = 2.864788975654116 / H ** 3
 
             return sigma * (
                 93.3333333333 * q ** 7
@@ -324,8 +324,8 @@ def dWdr(q: float, h: float, kernel: str = "cubic_spline"):
     elif kernel == "wendland_C6":
 
         if q < 1:
-            #  sigma = 78/(7*np.pi*h**2)
-            sigma = 3.546881588905096 / h ** 3
+            #  sigma = 78/(7*np.pi*H**2)
+            sigma = 3.546881588905096 / H ** 3
             return sigma * (
                 352 * q ** 10
                 - 2310 * q ** 9
