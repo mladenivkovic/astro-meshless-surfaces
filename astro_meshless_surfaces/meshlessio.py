@@ -244,7 +244,7 @@ def read_boxsize(fnamestr="_0000.hdf5"):
     for f in filelist:
         if fnamestr in f:
             # read in boxsize
-            f5 = h5py.File(f)
+            f5 = h5py.File(f, "r")
             h = f5["Header"]
             boxsize = h.attrs["BoxSize"]
             f5.close()

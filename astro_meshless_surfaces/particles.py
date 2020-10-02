@@ -525,7 +525,7 @@ def get_tree(
     """
 
     if periodic:
-        boxsize = L
+        boxsize = L[:2] # make sure we trim it down to 2d
     else:
         boxsize = None
 
